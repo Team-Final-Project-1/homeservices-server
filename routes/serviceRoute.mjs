@@ -1,7 +1,33 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
+import { createClient } from "@supabase/supabase-js";
+import multer from "multer";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY,
+);
 
 const serviceRouter = Router();
+// เก็บไฟล์รูปภาพในแรมของเซิร์ฟเวอร์ เช็คขนาดและประเภทไฟล์ก่อนอัปโหลดไปยัง Supabase Storage
+const multerUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, and WebP images are allowed"), false);
+    }
+  },
+});
+
+const imageFileUpload = multerUpload.fields([
+  { name: "imageFile", maxCount: 1 },
+]);
 
 // GET /api/services - ดึงข้อมูลบริการทั้งหมด
 serviceRouter.get("/", async (req, res) => {
@@ -119,14 +145,32 @@ serviceRouter.get("/:id", async (req, res) => {
 });
 
 // POST /api/services - เพิ่มบริการใหม่
-serviceRouter.post("/", async (req, res) => {
+serviceRouter.post("/", imageFileUpload, async (req, res) => {
   try {
-    const { name, description, price, category_id } = req.body;
-    const response = await connectionPool.query(
-      "INSERT INTO services (name, description, price, category_id) VALUES ($1, $2, $3, $4) RETURNING *",
-      [name, description, price, category_id],
-    );
-    res.status(201).json(response.rows[0]);
+    // 1) รับข้อมูลจาก request body และไฟล์ที่อัปโหลด
+    const newPost = req.body;
+    const file = req.files.imageFile[0];
+    // 2) กำหนด bucket และ path ที่จะเก็บไฟล์ใน Supabase
+    const bucketName = "services-image";
+    const filePath = `posts/${Date.now()}_${file.originalname}`; // สร้าง path ที่ไม่ซ้ำกัน
+    // 3) อัปโหลดไฟล์ไปยัง Supabase Storage
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false, // ป้องกันการเขียนทับไฟล์เดิม
+      });
+    if (error) {
+      throw error;
+    }
+    // 4) ดึง URL สาธารณะของไฟล์ที่อัปโหลด
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from(bucketName).getPublicUrl(data.path);
+    // 5) บันทึกข้อมูลโพสต์ลงในฐานข้อมูล
+   
+    // 6) ส่งผลลัพธ์กลับไปยัง client
+
   } catch (error) {
     console.error("Error creating service:", error);
     res.status(500).json({ error: "Internal Server Error" });
