@@ -1,8 +1,10 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import "dotenv/config";
-import ServiceRoute from "./routes/serviceRoute.mjs";
+
+// import ServiceRoute from "./routes/serviceRoute.mjs";
 import categoryRoute from "./routes/categoryRoute.mjs";
+import authRoute from "./routes/authRoute.mjs";
 import OrderRoute from "./routes/orderRoute.mjs";
 
 const app = express();
@@ -20,8 +22,9 @@ app.use(
   }),
 );
 
-app.use("/api/services", ServiceRoute);
+// app.use("/api/services", ServiceRoute);
 app.use("/api/categories", categoryRoute);
+app.use("/api/auth", authRoute);
 
 app.use("/api/orders", OrderRoute);
 
