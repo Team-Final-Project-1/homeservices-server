@@ -47,8 +47,75 @@ const technicianServices = {
 
     // Combine the results into a single object
     return {
-        ...technicianData,
-        services: servicesResult.rows,
+      ...technicianData,
+      services: servicesResult.rows,
+    };
+  },
+  updateTechnicianProfile: async (technicianId, data) => {
+    // Destructure the input data for easier access and to ensure we only use the expected fields
+    const {
+      first_name,
+      last_name,
+      phone,
+      is_available,
+      latitude,
+      longitude,
+      service_ids, // array of service IDs that the technician can perform
+    } = data;
+
+    // Query 1: update users table
+    await pool.query(
+      `UPDATE users
+        SET first_name = $1,
+            last_name = $2,
+            phone = $3
+            updated_at = NOW()
+        WHERE id = $4 AND role = 'technician'`,
+      [first_name, last_name, phone, technicianId],
+    );
+
+    // Query 2: update user_profiles table
+    // location_updated_at อัปเดตเฉพาะตอนที่ส่ง latitude มาด้วย (กดปุ่มรีเฟรช)
+    await pool.query(
+      `UPDATE user_profiles
+        SET
+        is_available = $1,
+        latitude = $2,
+        longitude = $3,
+        location_updated_at = 
+        CASE 
+            WHEN $2 IS NOT NULL THEN NOW() // ถ้า latitude มีค่า (กดรีเฟรช) → อัปเดต timestamp
+            ELSE location_updated_at
+        END
+        WHERE user_id = $4`,
+      [is_available, latitude ?? null, longitude ?? null, technicianId], // ถ้า latitude ไม่ส่งมา → ส่ง null เพื่อไม่ให้เงื่อนไข CASE WHEN อัปเดต timestamp
+    );
+
+    // --- Query 3: อัปเดต technician_services ด้วย Delete + Insert ---
+    // ลบทุก service ของช่างคนนี้ก่อน แล้ว insert ใหม่ทั้งหมด
+    await pool.query(
+      `DELETE FROM technician_services WHERE technician_id = $1`,
+      [technicianId],
+    );
+
+    // Insert เฉพาะตอนที่มี service_ids ส่งมา ถ้า array ว่างก็ข้ามไป
+    if (service_ids && service_ids.length > 0) {
+      // สร้าง placeholders เช่น ($1, $2), ($1, $3), ($1, $4)
+      // $1 คือ technicianId ที่ใช้ร่วมกัน
+      // index + 2 เพราะ $1 ถูกใช้โดย technicianId แล้ว
+      const placeholders = service_ids
+        .map((_, index) => `($1, $${index + 2})`)
+        .join(", ");
+
+      await pool.query(
+        `INSERT INTO technician_services (technician_id, service_id) VALUES ${placeholders}`,
+        [technicianId, ...service_ids], // ส่ง technicianId ตามด้วย service_ids เป็น parameters
+      );
     }
+    return technicianServices.getTechnicianProfile(technicianId); // ส่งกลับข้อมูลโปรไฟล์ที่อัปเดตแล้ว
   },
 };
+
+export default technicianServices;
+
+//Tips: ที่มีการ query หลายๆตัวใน updateTechnicianProfile เรียกหลักการนี้ว่า "Database Normalization" คือการแยกข้อมูลออกเป็นหลายๆตารางตามประเภทของข้อมูล เพื่อให้จัดการและอัปเดตได้ง่ายขึ้น โดยไม่ต้องซ้ำซ้อนข้อมูลในหลายๆที่
