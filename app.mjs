@@ -3,6 +3,7 @@ import cors from "cors";
 import "dotenv/config";
 import ServiceRoute from "./routes/serviceRoute.mjs";
 import categoryRoute from "./routes/categoryRoute.mjs";
+import technicianProfileRoute from "./routes/technicianProfileRoute.mjs";
 
 const app = experss();
 const PORT = process.env.PORT || 4000;
@@ -20,7 +21,9 @@ app.use(
 
 app.use("/api/services", ServiceRoute);
 app.use("/api/categories", categoryRoute);
-
+app.use("/api/technicians", technicianProfileRoute);
+app.use("/api/auth", authRoute);
+app.use("/api/orders", OrderRoute);
 
 app.get("/test", (req, res) => {
   res.status(200).json({ message: "Hello World!" });

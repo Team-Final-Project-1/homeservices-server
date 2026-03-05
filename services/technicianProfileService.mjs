@@ -80,8 +80,8 @@ const technicianProfileServices = {
       `UPDATE user_profiles
         SET
         is_available = $1,
-        latitude = $2,
-        longitude = $3,
+        latitude = $2::numeric,
+        longitude = $3::numeric,
         location_updated_at = 
         CASE 
             WHEN $2 IS NOT NULL THEN NOW()
