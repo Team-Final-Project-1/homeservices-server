@@ -68,7 +68,7 @@ const technicianProfileServices = {
       `UPDATE users
         SET first_name = $1,
             last_name = $2,
-            phone = $3
+            phone = $3,
             updated_at = NOW()
         WHERE id = $4 AND role = 'technician'`,
       [first_name, last_name, phone, technicianId],
@@ -80,11 +80,11 @@ const technicianProfileServices = {
       `UPDATE user_profiles
         SET
         is_available = $1,
-        latitude = $2,
-        longitude = $3,
+        latitude = $2::numeric,
+        longitude = $3::numeric,
         location_updated_at = 
         CASE 
-            WHEN $2 IS NOT NULL THEN NOW() // ถ้า latitude มีค่า (กดรีเฟรช) → อัปเดต timestamp
+            WHEN $2 IS NOT NULL THEN NOW()
             ELSE location_updated_at
         END
         WHERE user_id = $4`,
