@@ -4,6 +4,8 @@ import "dotenv/config";
 import ServiceRoute from "./routes/serviceRoute.mjs";
 import categoryRoute from "./routes/categoryRoute.mjs";
 import technicianProfileRoute from "./routes/technicianProfileRoute.mjs";
+import authRoute from "./routes/authRoute.mjs";
+import orderRoute from "./routes/orderRoute.mjs";
 
 const app = experss();
 const PORT = process.env.PORT || 4000;
@@ -23,7 +25,7 @@ app.use("/api/services", ServiceRoute);
 app.use("/api/categories", categoryRoute);
 app.use("/api/technicians", technicianProfileRoute);
 app.use("/api/auth", authRoute);
-app.use("/api/orders", OrderRoute);
+app.use("/api/orders", orderRoute);
 
 app.get("/test", (req, res) => {
   res.status(200).json({ message: "Hello World!" });
