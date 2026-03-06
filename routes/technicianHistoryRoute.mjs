@@ -1,4 +1,5 @@
 import express from "express";
+import pool from "../utils/db.mjs";
 import * as technicianHistoryService from "../services/technicianHistoryService.mjs";
 
 const technicianHistoryRouter = express.Router();
