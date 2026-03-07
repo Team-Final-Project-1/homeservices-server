@@ -1,12 +1,13 @@
 import express from "express";
 import pool from "../utils/db.mjs";
 import * as technicianHistoryService from "../services/technicianHistoryService.mjs";
+import protectTechnician from "../middlewares/protectTechnician.mjs";
 
 const technicianHistoryRouter = express.Router();
 
 // GET /api/technician/history - ดึงประวัติการทำงานทั้งหมด
 // TODO: เปลี่ยนจาก params หรือ mock เป็น req.user.id หลังทำ Auth
-technicianHistoryRouter.get("/history", async (req, res) => {
+technicianHistoryRouter.get("/history", protectTechnician, async (req, res) => {
   try {
     const { technicianId } = req.query; // หรือรับจาก Token
     if (!technicianId) {
@@ -21,7 +22,7 @@ technicianHistoryRouter.get("/history", async (req, res) => {
 });
 
 // GET /api/technician/history/:orderId - ดึงรายละเอียดคำสั่งซ่อมรายอัน
-technicianHistoryRouter.get("/history/:orderId", async (req, res) => {
+technicianHistoryRouter.get("/history/:orderId", protectTechnician, async (req, res) => {
   try {
     const { orderId } = req.params;
     const detail = await technicianHistoryService.getTechnicianHistoryDetail(orderId);

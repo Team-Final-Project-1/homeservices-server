@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import pool from "../utils/db.mjs";
 import generateUsername from "../utils/generateusername.mjs";
 import { supabaseAdmin } from "../utils/supabaseAdmin.mjs";
+import protectUser from "../middlewares/protectUser.mjs";
 
 // สร้าง Supabase client ด้วย URL และ ANON KEY จาก environment variables เพื่อเชื่อมต่อกับ Supabase Auth
 // เราจะใช้ Supabase Auth สำหรับการจัดการผู้ใช้และการตรวจสอบสิทธิ์ ในขณะที่ข้อมูลผู้ใช้เพิ่มเติมจะถูกเก็บในฐานข้อมูล PostgreSQL ของเรา
@@ -110,7 +111,7 @@ authRouter.post("/login", async (req, res) => {
   }
 });
 // Route สำหรับดึงข้อมูลผู้ใช้ที่เข้าสู่ระบบแล้ว
-authRouter.get("/get-user", async (req, res) => {
+authRouter.get("/get-user", protectUser, async (req, res) => {
   // แยก token ออกจาก header ของ request โดยคาดว่า token จะถูกส่งมาในรูปแบบ "Bearer <token>" ดังนั้นเราจะใช้ split(" ") เพื่อแยกคำว่า "Bearer" ออกจาก token และดึงเฉพาะ token มาใช้งาน
   const token = req.headers.authorization?.split(" ")[1];
   // หาก token ไม่มีอยู่ใน header เราจะส่ง response กลับไปยัง client ว่าการเข้าถึงถูกปฏิเสธเนื่องจากไม่มี token
@@ -157,7 +158,7 @@ authRouter.get("/get-user", async (req, res) => {
     res.status(500).json({ error: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
   }
 });
-authRouter.put("/reset-password", async (req, res) => {
+authRouter.put("/reset-password", protectUser, async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   const { oldPassword, newPassword } = req.body;
   if (!token) {

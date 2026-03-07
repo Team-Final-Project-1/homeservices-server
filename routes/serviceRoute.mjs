@@ -3,6 +3,7 @@ import connectionPool from "../utils/db.mjs";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import postServiceValidate from "../middlewares/postServiceValidate.mjs";
+import protectAdmin from "../middlewares/protectAdmin.mjs";
 
 let supabase;
 
@@ -180,6 +181,7 @@ serviceRouter.get("/:id", async (req, res) => {
 // POST /api/services - เพิ่มบริการใหม่
 serviceRouter.post(
   "/",
+  protectAdmin,
   imageFileUpload,
   postServiceValidate,
   async (req, res) => {
@@ -215,7 +217,7 @@ serviceRouter.post(
 );
 
 // PUT /api/services/:id - อัปเดตบริการตาม ID
-serviceRouter.put("/:id", imageFileUpload, async (req, res) => {
+serviceRouter.put("/:id", protectAdmin, imageFileUpload, async (req, res) => {
   const { id } = req.params;
   const { name, description, price, category_id } = req.body;
   try {
@@ -327,7 +329,7 @@ serviceRouter.put("/:id", imageFileUpload, async (req, res) => {
 });
 
 // DELETE /api/services/:id - ลบบริการตาม ID
-serviceRouter.delete("/:id", async (req, res) => {
+serviceRouter.delete("/:id", protectAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const response = await connectionPool.query(
