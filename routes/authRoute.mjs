@@ -179,7 +179,7 @@ authRouter.put("/reset-password", async (req, res) => {
     if (loginError) {
       return res.status(400).json({ error: "รหัสผ่านเดิมไม่ถูกต้อง" });
     }
-    const { error: updateError } = await supabase.auth.admin.updateUserById(
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       userData.user.id,
       { password: newPassword },
     );
