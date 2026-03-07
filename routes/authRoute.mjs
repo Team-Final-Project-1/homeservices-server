@@ -3,6 +3,7 @@ import { googleOAuth, facebookOAuth } from "../services/authService.mjs";
 import { createClient } from "@supabase/supabase-js";
 import pool from "../utils/db.mjs";
 import generateUsername from "../utils/generateusername.mjs";
+import { supabaseAdmin } from "../utils/supabaseAdmin.mjs";
 
 // สร้าง Supabase client ด้วย URL และ ANON KEY จาก environment variables เพื่อเชื่อมต่อกับ Supabase Auth
 // เราจะใช้ Supabase Auth สำหรับการจัดการผู้ใช้และการตรวจสอบสิทธิ์ ในขณะที่ข้อมูลผู้ใช้เพิ่มเติมจะถูกเก็บในฐานข้อมูล PostgreSQL ของเรา
@@ -78,6 +79,117 @@ authRouter.post("/register", async (req, res) => {
   } catch (error) {
     console.error("Error during registration:", error);
     res.status(500).json({ error: "An error occurred during registration" });
+  }
+});
+// Route สำหรับการเข้าสู่ระบบ (Login)
+authRouter.post("/login", async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) {
+      if (
+        error.code === "invalid_credentials" ||
+        error.message.includes("Invalid login credentials")
+      ) {
+        return res.status(400).json({
+          error: "Your password is incorrect or this email does not exist",
+        });
+      }
+      return res.status(400).json({ error: error.message });
+    }
+    return res.status(200).json({
+      message: "Signed in successfully",
+      access_token: data.session.access_token,
+    });
+  } catch (error) {
+    console.error("Error during login:", error);
+    return res.status(500).json({ error: "An error occurred during login" });
+  }
+});
+// Route สำหรับดึงข้อมูลผู้ใช้ที่เข้าสู่ระบบแล้ว
+authRouter.get("/get-user", async (req, res) => {
+  // แยก token ออกจาก header ของ request โดยคาดว่า token จะถูกส่งมาในรูปแบบ "Bearer <token>" ดังนั้นเราจะใช้ split(" ") เพื่อแยกคำว่า "Bearer" ออกจาก token และดึงเฉพาะ token มาใช้งาน
+  const token = req.headers.authorization?.split(" ")[1];
+  // หาก token ไม่มีอยู่ใน header เราจะส่ง response กลับไปยัง client ว่าการเข้าถึงถูกปฏิเสธเนื่องจากไม่มี token
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized: Token missing" });
+  }
+  try {
+    // เราจะใช้ token ที่ได้รับมาเพื่อตรวจสอบความถูกต้องและดึงข้อมูลผู้ใช้จาก Supabase Auth โดยใช้ supabase.auth.getUser(token)
+    // หาก token ไม่ถูกต้องหรือหมดอายุ เราจะส่ง response กลับไปยัง client ว่าการเข้าถึงถูกปฏิเสธเนื่องจาก token ไม่ถูกต้องหรือหมดอายุ
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error) {
+      return res.status(401).json({ error: "Unauthorized or token expired" });
+    }
+    const supabaseUserId = data.user.id;
+    const query = `SELECT 
+        u.id,
+        u.email,
+        u.username,
+        u.role,
+        u.full_name,
+        u.phone,
+        up.avatar_url AS profile_pic
+      FROM users u
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      WHERE u.auth_user_id = $1
+    `;
+    const values = [supabaseUserId];
+    const { rows } = await pool.query(query, values);
+    if (!rows[0]) {
+      return res.status(404).json({ error: "User profile not found" });
+    }
+    console.log("DB rows[0]:", rows[0]);
+    res.status(200).json({
+      id: data.user.id,
+      email: rows[0].email,
+      username: rows[0].username,
+      role: rows[0].role,
+      full_name: rows[0].full_name,
+      phone: rows[0].phone,
+      profile_pic: rows[0].profile_pic,
+    });
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    res.status(500).json({ error: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
+  }
+});
+authRouter.put("/reset-password", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  const { oldPassword, newPassword } = req.body;
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized: Token missing" });
+  }
+  if (!newPassword) {
+    return res.status(400).json({ error: "New password is required" });
+  }
+  try {
+    const { data: userData, error: userError } =
+      await supabase.auth.getUser(token);
+    if (userError || !userData.user) {
+      return res.status(401).json({ error: "Unauthorized or token expired" });
+    }
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: userData.user.email,
+      password: oldPassword,
+    });
+    if (loginError) {
+      return res.status(400).json({ error: "รหัสผ่านเดิมไม่ถูกต้อง" });
+    }
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      userData.user.id,
+      { password: newPassword },
+    );
+    if (updateError) {
+      return res.status(400).json({ error: updateError.message });
+    }
+    res.status(200).json({ message: "เปลี่ยนรหัสผ่านเรียบร้อยแล้ว" });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.status(500).json({ error: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์" });
   }
 });
 
