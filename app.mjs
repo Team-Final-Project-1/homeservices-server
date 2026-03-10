@@ -7,6 +7,7 @@ import technicianProfileRoute from "./routes/technicianProfileRoute.mjs";
 import authRoute from "./routes/authRoute.mjs";
 import technicianHistoryRoute from "./routes/technicianHistoryRoute.mjs";
 import orderRoute from "./routes/orderRoute.mjs";
+import promotionRouter from './routes/promotionRoute.mjs';
 
 const app = experss();
 const PORT = process.env.PORT || 4000;
@@ -28,6 +29,7 @@ app.use("/api/technicians", technicianProfileRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/orders", orderRoute);
 app.use("/api/technician", technicianHistoryRoute);
+app.use('/api/promotions', promotionRouter);
 
 
 app.get("/test", (req, res) => {
