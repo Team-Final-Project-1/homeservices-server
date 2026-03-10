@@ -8,7 +8,7 @@ const technicianProfileRouter = express.Router();
 const TEMP_TECHNICIAN_ID = 34;
 
 // GET /api/technician/profile
-technicianProfileRouter.get("/profile", protectTechnician, async (req, res) => {
+technicianProfileRouter.get("/profile", async (req, res) => {
   try {
     const profile =
       await technicianProfileServices.getTechnicianProfile(TEMP_TECHNICIAN_ID);
@@ -24,7 +24,7 @@ technicianProfileRouter.get("/profile", protectTechnician, async (req, res) => {
 });
 
 // PUT /api/technician/profile
-technicianProfileRouter.put("/profile", protectTechnician, async (req, res) => {
+technicianProfileRouter.put("/profile", async (req, res) => {
   try {
     const {
       first_name,
