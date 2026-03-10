@@ -18,7 +18,6 @@ const authRouter = express.Router();
 // Route สำหรับการลงทะเบียนผู้ใช้ (Register)
 // ในขั้นตอนการลงทะเบียน เราจะตรวจสอบว่าอีเมลที่ผู้ใช้ส่งมานั้นซ้ำกับผู้ใช้อื่นหรือไม่ หากไม่ซ้ำ เราจะสร้างบัญชีผู้ใช้ใน Supabase Auth
 // และเพิ่มข้อมูลผู้ใช้ในตาราง users ของฐานข้อมูล PostgreSQL
-
 authRouter.post("/register", async (req, res) => {
   // ดึงข้อมูลที่ user ส่งมาจาก request body ซึ่งประกอบด้วย name, phone, email, password
   const { full_name, phone, email, password } = req.body;
@@ -82,6 +81,83 @@ authRouter.post("/register", async (req, res) => {
     res.status(500).json({ error: "An error occurred during registration" });
   }
 });
+
+// Route สำหรับการลงทะเบียนผู้ใช้ (Register)
+// ในขั้นตอนการลงทะเบียน เราจะตรวจสอบว่าอีเมลที่ผู้ใช้ส่งมานั้นซ้ำกับผู้ใช้อื่นหรือไม่ หากไม่ซ้ำ เราจะสร้างบัญชีผู้ใช้ใน Supabase Auth
+// และเพิ่มข้อมูลผู้ใช้ในตาราง users ของฐานข้อมูล PostgreSQL โดยกำหนด role เป็น "technician"
+authRouter.post("/register/technician", async (req, res) => {
+  // ดึงข้อมูลที่ user ส่งมาจาก request body ซึ่งประกอบด้วย first_name, last_name, phone, email, password
+  const { first_name, last_name, phone, email, password } = req.body;
+
+  // Validate
+  if (!first_name || !last_name || !phone || !email || !password) {
+    return res.status(400).json({ error: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+  }
+
+  const full_name = `${first_name.trim()} ${last_name.trim()}`;
+
+  try {
+    // เราจะสร้างบัญชีผู้ใช้ใน Supabase Auth ด้วย email และ password ที่ผู้ใช้ส่งมา
+    // หากการสร้างบัญชีผู้ใช้ใน Supabase Auth สำเร็จ เราจะได้รับข้อมูลผู้ใช้ใหม่ในตัวแปร data และหากมีข้อผิดพลาดจะถูกเก็บในตัวแปร supabaseError
+    const { data, error: supabaseError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    // หากมีข้อผิดพลาดในการสร้างบัญชีผู้ใช้ในSupabase Auth เราจะตรวจสอบว่าเป็นข้อผิดพลาดที่เกิดจากการที่มีผู้ใช้ที่มี email นี้อยู่แล้วหรือไม่ และส่ง response กลับไปยัง client ตามกรณี
+    if (supabaseError) {
+      // ตรวจสอบว่า error code เป็น "user_already_exists" หรือไม่ ซึ่งหมายความว่ามีผู้ใช้ที่มี email นี้อยู่แล้วในระบบ
+      if (supabaseError.code === "user_already_exists") {
+        return res
+          .status(400)
+          .json({ error: "User with this email already exists" });
+      }
+      return res
+        .status(400)
+        .json({ error: "Failed to create user. Please try again." });
+    }
+
+    // หากการสร้างบัญชีผู้ใช้ใน Supabase Auth สำเร็จ เราจะได้รับข้อมูลผู้ใช้ใหม่ในตัวแปร data ซึ่งประกอบด้วยข้อมูลต่าง ๆ ของผู้ใช้ รวมถึง id ของผู้ใช้ที่ถูกสร้างขึ้น
+    const supabaseUserId = data.user.id;
+    const username = generateUsername(email);
+
+    // หลังจากที่เราสร้างบัญชีผู้ใช้ใน Supabase Auth สำเร็จ เราจะเพิ่มข้อมูลผู้ใช้ในตาราง users ของฐานข้อมูล PostgreSQL
+    // โดยใช้ id ที่ได้จาก Supabase Auth เป็น primary key และเก็บข้อมูลเพิ่มเติมเช่น full_name, phone, email และ role
+    const query = `INSERT INTO users (auth_user_id, full_name, first_name, last_name, phone, email, username, role)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *;`;
+    // เราจะใช้ parameterized query เพื่อป้องกัน SQL injection โดยการใช้ $1, $2, $3, $4, $5, $6, $7, $8 เป็นตัวแทนของค่าที่จะถูกแทรกเข้าไปใน
+    // query และเก็บค่าที่จะถูกแทรกไว้ใน array values
+    const values = [
+      supabaseUserId,
+      full_name,
+      first_name.trim(),
+      last_name.trim(),
+      phone,
+      email,
+      username,
+      "technician",
+    ];
+
+    // เราจะใช้ connectionPool.query เพื่อรัน query ที่เราเตรียมไว้ โดยส่ง query และ values เข้าไปเป็นพารามิเตอร์
+    // และเก็บผลลัพธ์ที่ได้จากการรัน query ในตัวแปร rows ซึ่งจะเป็น array ของแถวที่ถูกแทรกเข้าไปในตาราง users
+    const { rows } = await pool.query(query, values);
+    // Rollback Supabase Auth ถ้า INSERT ล้มเหลว
+    if (!rows[0]) {
+      await supabaseAdmin.auth.admin.deleteUser(supabaseUserId);
+      return res.status(500).json({ error: "Failed to create user profile" });
+    }
+
+    res.status(201).json({
+      message: "User created successfully",
+      user: rows[0],
+    });
+  } catch (error) {
+    console.error("Error during registration:", error);
+    res.status(500).json({ error: "An error occurred during registration" });
+  }
+});
+
 // Route สำหรับการเข้าสู่ระบบ (Login)
 authRouter.post("/login", async (req, res) => {
   const { email, password } = req.body;
@@ -96,7 +172,7 @@ authRouter.post("/login", async (req, res) => {
         error.message.includes("Invalid login credentials")
       ) {
         return res.status(400).json({
-          error: "Your password is incorrect or this email does not exist",
+          error: "รหัสผ่านหรืออีเมลของท่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง",
         });
       }
       return res.status(400).json({ error: error.message });
@@ -180,10 +256,10 @@ authRouter.put("/reset-password", protectUser, async (req, res) => {
     if (loginError) {
       return res.status(400).json({ error: "รหัสผ่านเดิมไม่ถูกต้อง" });
     }
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      userData.user.id,
-      { password: newPassword },
-    );
+    const { error: updateError } =
+      await supabaseAdmin.auth.admin.updateUserById(userData.user.id, {
+        password: newPassword,
+      });
     if (updateError) {
       return res.status(400).json({ error: updateError.message });
     }

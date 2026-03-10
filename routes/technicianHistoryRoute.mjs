@@ -1,5 +1,4 @@
 import express from "express";
-import pool from "../utils/db.mjs";
 import * as technicianHistoryService from "../services/technicianHistoryService.mjs";
 import protectTechnician from "../middlewares/protectTechnician.mjs";
 

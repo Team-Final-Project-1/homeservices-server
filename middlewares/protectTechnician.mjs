@@ -18,7 +18,7 @@ const protectTechnician = async (req, res, next) => {
     }
 
     const { rows } = await pool.query(
-      `SELECT role FROM users WHERE auth_user_id = $1`,
+      `SELECT id, role FROM users WHERE auth_user_id = $1`,
       [data.user.id],
     );
 
@@ -32,7 +32,7 @@ const protectTechnician = async (req, res, next) => {
         .json({ error: "Forbidden: Technician access only" });
     }
 
-    req.user = { ...data.user, role: rows[0].role };
+    req.user = { ...data.user, id: rows[0].id, role: rows[0].role };
     next();
   } catch (err) {
     console.error("Error in protectTechnician middleware:", err);
@@ -41,4 +41,3 @@ const protectTechnician = async (req, res, next) => {
 };
 
 export default protectTechnician;
-
