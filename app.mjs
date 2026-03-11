@@ -4,6 +4,7 @@ import "dotenv/config";
 import ServiceRoute from "./routes/serviceRoute.mjs";
 import categoryRoute from "./routes/categoryRoute.mjs";
 import paymentGateway, { stripeWebhookHandler } from "./routes/paymentGateway.mjs";
+import geocodeRoute from "./routes/geocodeRoute.mjs";
 
 const app = experss();
 const PORT = process.env.PORT || 4000;
@@ -30,6 +31,7 @@ app.use(
 app.use("/api/services", ServiceRoute);
 app.use("/api/categories", categoryRoute);
 app.use("/api/payment", paymentGateway);
+app.use("/api/geocode", geocodeRoute);
 
 
 app.get("/test", (req, res) => {
