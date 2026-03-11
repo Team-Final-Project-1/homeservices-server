@@ -48,28 +48,54 @@ const technicianOrderService = {
   },
 
   // ACCEPT ORDER — ช่างกดรับงาน
-  // ใช้ Transaction เพราะต้องอัปเดต 2 ตารางพร้อมกัน
+  // ใช้ Transaction เพราะต้องอัปเดต 2 ตารางพร้อมกัน (technician_assignments + orders)
+  // ถ้าไม่มี transaction ช่างกดรับงานพร้อมกันหลายคน → ข้อมูลอาจจะค้างครึ่งทาง
+  // เช่น มีช่าง 2 คนกดรับงานเดียวกันพร้อมกัน → ทั้งคู่เช็คว่างแล้วก็อัปเดตได้ทั้งคู่ → ข้อมูลผิดพลาด
   // ถ้าอันใดอันนึงล้มเหลว → rollback ทั้งหมด ป้องกันข้อมูลค้างครึ่งทาง
   acceptOrder: async (orderId, technicianId) => {
     // ขอ connection สำหรับ transaction
     const client = await pool.connect();
     try {
-      await client.query("BEGIN"); // เริ่ม transaction
+      // เริ่ม transaction หลังจากนี้ทุก query ที่รันจะยังไม่ถูกบันทึกจริง
+      // จนกว่าเราจะ commit หรือ rollback
+      await client.query("BEGIN");
+
       // เช็คก่อนว่า order ยังว่างอยู่มั้ย (ป้องกัน race condition)
       // กรณีช่าง 2 คนกดรับพร้อมกัน → คนแรกได้ คนหลัง error
       const checkResult = await client.query(
-        `
-        SELECT 1 FROM technician_assignments 
+        `SELECT 1 FROM technician_assignments 
         WHERE order_id = $1 AND status = 'assigned'`,
         [orderId],
       );
+
+      // ถ้าเจอแถวที่มี order_id นี้แล้ว → แปลว่ามีช่างรับงานนี้ไปแล้ว → rollback และแจ้ง error
       if (checkResult.rowCount > 0) {
         await client.query("ROLLBACK");
-        return { success: false, message: "งานนี้มีช่างอ่านอื่นรับไปแล้ว" };
+        return {
+          success: false,
+          message: "งานนี้ไม่ว่างแล้ว กรุณาลองใหม่อีกครั้ง",
+        };
       }
+
+      // ถ้าเช็คผ่าน → บันทึกข้อมูลการรับงาน และอัปเดตสถานะ order เป็น in_progress
+      await client.query(
+        `INSERT INTO technician_assignments (order_id, technician_id, status, assigned_at)
+         VALUES ($1, $2, 'assigned', NOW())`,
+        [orderId, technicianId],
+      );
+
+      // อัปเดตสถานะ order เป็น in_progress
+      await client.query(
+        `UPDATE orders SET status = 'in_progress' WHERE id = $1`,
+        [orderId],
+      );
+
+      await client.query("COMMIT"); // ถ้าไม่มีปัญหา → commit เพื่อบันทึกข้อมูลจริง และแจ้ง success
+      return { success: true, message: "รับงานสำเร็จ" };
+      
     } catch (error) {
       await client.query("ROLLBACK"); // ถ้าเช็คมีปัญหา → rollback และแจ้ง error
-      console.error("❌ รับงานล้มเหลว:", error);
+      console.error("รับงานล้มเหลว:", error);
       return { success: false, message: "เกิดข้อผิดพลาดในการรับงาน" };
     } finally {
       client.release(); // ปล่อย connection กลับไปที่ pool
