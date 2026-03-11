@@ -11,6 +11,7 @@ import technicianHistoryRoute from "./routes/technicianHistoryRoute.mjs";
 import orderRoute from "./routes/orderRoute.mjs";
 import promotionRouter from './routes/promotionRoute.mjs';
 import cartRoute from "./routes/cartRoute.mjs";
+import technicianOrderRoute from "./routes/technicianOrderRoute.mjs";
 
 const app = experss();
 const PORT = process.env.PORT || 4000;
@@ -46,6 +47,11 @@ app.use('/api/promotions', promotionRouter);
 app.use("/api/cart", cartRoute);
 
 app.use("/api/technician-profile", technicianProfileRoute);
+
+
+
+app.use("/api/technician-orders", technicianOrderRoute);
+
 
 app.get("/test", (req, res) => {
   res.status(200).json({ message: "Hello World!" });

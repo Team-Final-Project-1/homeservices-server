@@ -10,8 +10,11 @@ const technicianOrderService = {
       SELECT
         o.id,
         o.status,
-        o.total_price,
+        o.net_price,
         o.created_at,
+        o.appointment_date,
+        o.appointment_time,
+        o.remark,
         CONCAT('AD', LPAD(o.id::TEXT, 8, '0')) AS order_code,
         a.address_line,
         a.city,
@@ -23,19 +26,14 @@ const technicianOrderService = {
       LEFT JOIN addresses a ON o.address_id = a.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN services s ON oi.service_id = s.id
-      LEFT JOIN service_items si ON oi.service_id = si.service_id
+      LEFT JOIN service_items si ON s.id = si.service_id
 
       WHERE o.status = 'completed'
-
-        -- เงื่อนไข 1: ยังไม่มีช่างคนไหนรับงานนี้
         AND NOT EXISTS (
           SELECT 1 FROM technician_assignments ta
           WHERE ta.order_id = o.id
             AND ta.status = 'assigned'
         )
-
-        -- เงื่อนไข 2: ช่างคนนี้ยังไม่เคยปฏิเสธงานนี้
-        -- ถ้าเคยปฏิเสธไปแล้ว → ไม่แสดงให้ช่างคนนี้เห็นอีก
         AND NOT EXISTS (
           SELECT 1 FROM technician_assignments ta
           WHERE ta.order_id = o.id
@@ -43,18 +41,23 @@ const technicianOrderService = {
             AND ta.status = 'rejected'
         )
 
-      GROUP BY o.id, o.status, o.total_price, o.created_at, a.address_line, a.city, a.province
+      GROUP BY o.id, o.status, o.net_price, o.created_at,
+               o.appointment_date, o.appointment_time, o.remark,
+               a.address_line, a.city, a.province
       ORDER BY o.created_at DESC
-    `,
+      `,
       [technicianId],
-    ); // ส่ง technicianId เป็น parameter
+    );
 
     return result.rows.map((order) => ({
       id: order.id,
       order_code: order.order_code,
       status: order.status,
-      total_price: Number(order.total_price),
+      net_price: Number(order.net_price),
       created_at: order.created_at,
+      appointment_date: order.appointment_date, 
+      appointment_time: order.appointment_time, 
+      remark: order.remark,
       address: [order.address_line, order.city, order.province]
         .filter(Boolean)
         .join(" "),
@@ -73,6 +76,8 @@ const technicianOrderService = {
       await client.query("BEGIN");
 
       // เช็คก่อนว่า order ยังว่างอยู่มั้ย (ป้องกัน race condition)
+      // ถ้ามีช่างคนอื่นรับไปแล้ว → rollback และ return ว่างานนี้ถูกรับไปแล้ว
+      // ป้องกันกรณีที่ 2 ช่างกดรับงานเดียวกันพร้อมกัน
       const checkResult = await client.query(
         `SELECT 1 FROM technician_assignments
          WHERE order_id = $1 AND status = 'assigned'`,
