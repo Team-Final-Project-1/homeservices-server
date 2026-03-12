@@ -1,5 +1,6 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
+import protectAdmin from "../middlewares/protectAdmin.mjs";
 
 const categoryRouter = Router();
 
@@ -33,7 +34,7 @@ categoryRouter.get("/:id", async (req, res) => {
 });
 
 // POST /api/categories - สร้างหมวดหมู่ใหม่
-categoryRouter.post("/", async (req, res) => {
+categoryRouter.post("/", protectAdmin, async (req, res) => {
   const { name } = req.body;
   if (!name) {
     return res.status(400).json({ error: "Name is required" });
@@ -51,7 +52,7 @@ categoryRouter.post("/", async (req, res) => {
 });
 
 // PUT /api/categories/:id - อัปเดตหมวดหมู่ตาม ID
-categoryRouter.put("/:id", async (req, res) => {
+categoryRouter.put("/:id", protectAdmin, async (req, res) => {
   const { id } = req.params;
   const { name } = req.body;
   if (!name) {
@@ -73,7 +74,7 @@ categoryRouter.put("/:id", async (req, res) => {
 });
 
 // DELETE /api/categories/:id - ลบหมวดหมู่ตาม ID
-categoryRouter.delete("/:id", async (req, res) => {
+categoryRouter.delete("/:id", protectAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const result = await connectionPool.query(

@@ -68,7 +68,7 @@ const technicianProfileServices = {
       `UPDATE users
         SET first_name = $1,
             last_name = $2,
-            phone = $3
+            phone = $3,
             updated_at = NOW()
         WHERE id = $4 AND role = 'technician'`,
       [first_name, last_name, phone, technicianId],
@@ -77,18 +77,19 @@ const technicianProfileServices = {
     // Query 2: update user_profiles table
     // location_updated_at อัปเดตเฉพาะตอนที่ส่ง latitude มาด้วย (กดปุ่มรีเฟรช)
     await pool.query(
-      `UPDATE user_profiles
+      `INSERT INTO user_profiles (user_id, is_available, latitude, longitude, location_updated_at)
+        VALUES ($4, $1, $2::numeric, $3::numeric, CASE WHEN $2 IS NOT NULL THEN NOW() ELSE NULL END)
+        ON CONFLICT (user_id) DO UPDATE
         SET
-        is_available = $1,
-        latitude = $2,
-        longitude = $3,
-        location_updated_at = 
-        CASE 
-            WHEN $2 IS NOT NULL THEN NOW() // ถ้า latitude มีค่า (กดรีเฟรช) → อัปเดต timestamp
-            ELSE location_updated_at
-        END
-        WHERE user_id = $4`,
-      [is_available, latitude ?? null, longitude ?? null, technicianId], // ถ้า latitude ไม่ส่งมา → ส่ง null เพื่อไม่ให้เงื่อนไข CASE WHEN อัปเดต timestamp
+        is_available = EXCLUDED.is_available,
+        latitude = EXCLUDED.latitude,
+        longitude = EXCLUDED.longitude,
+        location_updated_at = CASE
+       WHEN EXCLUDED.latitude IS NOT NULL THEN NOW()
+       ELSE user_profiles.location_updated_at
+     END,
+     updated_at = NOW()`,
+      [is_available, latitude ?? null, longitude ?? null, technicianId],
     );
 
     // --- Query 3: อัปเดต technician_services ด้วย Delete + Insert ---

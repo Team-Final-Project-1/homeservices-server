@@ -3,6 +3,7 @@ import connectionPool from "../utils/db.mjs";
 import { createClient } from "@supabase/supabase-js";
 import multer from "multer";
 import postServiceValidate from "../middlewares/postServiceValidate.mjs";
+import protectAdmin from "../middlewares/protectAdmin.mjs";
 
 let supabase;
 
@@ -10,7 +11,7 @@ const getSupabase = () => {
   if (!supabase) {
     supabase = createClient(
       process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
+      process.env.SUPABASE_ANON_KEY,
     );
   }
   return supabase;
@@ -177,42 +178,46 @@ serviceRouter.get("/:id", async (req, res) => {
   }
 });
 
-// =======================================================
 // POST /api/services - เพิ่มบริการใหม่
-serviceRouter.post("/", imageFileUpload, async (req, res) => {
-  try {
-    // 1) รับข้อมูลจาก request body และไฟล์ที่อัปโหลด
-    const newPost = req.body;
-    const file = req.files.imageFile[0];
-    // 2) กำหนด bucket และ path ที่จะเก็บไฟล์ใน Supabase
-    const bucketName = "services-image";
-    const filePath = `posts/${Date.now()}_${file.originalname}`; // สร้าง path ที่ไม่ซ้ำกัน
-    // 3) อัปโหลดไฟล์ไปยัง Supabase Storage
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, file.buffer, {
-        contentType: file.mimetype,
-        upsert: false, // ป้องกันการเขียนทับไฟล์เดิม
-      });
-    if (error) {
-      throw error;
-    }
-    // 4) ดึง URL สาธารณะของไฟล์ที่อัปโหลด
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from(bucketName).getPublicUrl(data.path);
-    // 5) บันทึกข้อมูลโพสต์ลงในฐานข้อมูล
-   
-    // 6) ส่งผลลัพธ์กลับไปยัง client
+serviceRouter.post(
+  "/",
+  protectAdmin,
+  imageFileUpload,
+  postServiceValidate,
+  async (req, res) => {
+    try {
+      // 1) รับข้อมูลจาก request body และไฟล์ที่อัปโหลด
+      const newPost = req.body;
+      const file = req.files.imageFile[0];
+      // 2) กำหนด bucket และ path ที่จะเก็บไฟล์ใน Supabase
+      const bucketName = "services-image";
+      const filePath = `posts/${Date.now()}_${file.originalname}`; // สร้าง path ที่ไม่ซ้ำกัน
+      // 3) อัปโหลดไฟล์ไปยัง Supabase Storage
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file.buffer, {
+          contentType: file.mimetype,
+          upsert: false, // ป้องกันการเขียนทับไฟล์เดิม
+        });
+      if (error) {
+        throw error;
+      }
+      // 4) ดึง URL สาธารณะของไฟล์ที่อัปโหลด
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucketName).getPublicUrl(data.path);
+      // 5) บันทึกข้อมูลโพสต์ลงในฐานข้อมูล
 
-  } catch (error) {
-    console.error("Error creating service:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+      // 6) ส่งผลลัพธ์กลับไปยัง client
+    } catch (error) {
+      console.error("Error creating service:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
 
 // PUT /api/services/:id - อัปเดตบริการตาม ID
-serviceRouter.put("/:id", imageFileUpload, async (req, res) => {
+serviceRouter.put("/:id", protectAdmin, imageFileUpload, async (req, res) => {
   const { id } = req.params;
   const { name, description, price, category_id } = req.body;
   try {
@@ -324,7 +329,7 @@ serviceRouter.put("/:id", imageFileUpload, async (req, res) => {
 });
 
 // DELETE /api/services/:id - ลบบริการตาม ID
-serviceRouter.delete("/:id", async (req, res) => {
+serviceRouter.delete("/:id", protectAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const response = await connectionPool.query(

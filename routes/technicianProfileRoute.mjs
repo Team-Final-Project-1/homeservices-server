@@ -1,16 +1,16 @@
 import express from "express";
 import technicianProfileServices from "../services/technicianProfileService.mjs";
+import protectTechnician from "../middlewares/protectTechnician.mjs";
 
 const technicianProfileRouter = express.Router();
 
 // TODO: เปลี่ยนเป็น req.user.id หลัง authentication เสร็จ
-const TEMP_TECHNICIAN_ID = 34;
 
 // GET /api/technician/profile
-technicianProfileRouter.get("/profile", async (req, res) => {
+technicianProfileRouter.get("/profile", protectTechnician, async (req, res) => {
   try {
     const profile =
-      await technicianProfileServices.getTechnicianProfile(TEMP_TECHNICIAN_ID);
+      await technicianProfileServices.getTechnicianProfile(req.user.id);
     if (!profile) {
       return res.status(404).json({ message: "ไม่พบข้อมูลช่าง" });
     }
@@ -23,7 +23,7 @@ technicianProfileRouter.get("/profile", async (req, res) => {
 });
 
 // PUT /api/technician/profile
-technicianProfileRouter.put("/profile", async (req, res) => {
+technicianProfileRouter.put("/profile", protectTechnician, async (req, res) => {
   try {
     const {
       first_name,
@@ -44,7 +44,7 @@ technicianProfileRouter.put("/profile", async (req, res) => {
     const normalizedServiceIds = Array.isArray(service_ids) ? service_ids : [];
 
     const updatedProfile = await technicianProfileServices.updateTechnicianProfile(
-      TEMP_TECHNICIAN_ID,
+      req.user.id,
       {
         first_name,
         last_name,
