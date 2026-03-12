@@ -11,7 +11,8 @@ function q(req, name) {
 router.get('/preview', async (req, res) => {
   try {
     const address_line = q(req, 'address_line');
-    const city = q(req, 'city');
+    const district = q(req, 'district');
+    const subdistrict = q(req, 'subdistrict');
     const province = q(req, 'province');
     const postal_code = q(req, 'postal_code');
 
@@ -21,7 +22,8 @@ router.get('/preview', async (req, res) => {
 
     const coords = await geocodeAddress({
       address_line: address_line || undefined,
-      city: city || undefined,
+      district: district || undefined,
+      subdistrict: subdistrict || undefined,
       province: province || undefined,
       postal_code: postal_code || undefined,
     });

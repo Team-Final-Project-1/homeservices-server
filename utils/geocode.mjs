@@ -20,8 +20,14 @@ function delay(ms) {
  * Geocode to latitude/longitude for use with Leaflet (lat/lng).
  * Returns { latitude, longitude } or null.
  */
-export async function geocodeAddress({ address_line, city, province, postal_code }) {
-  const parts = [address_line, city, province, postal_code].filter(Boolean);
+export async function geocodeAddress({
+  address_line,
+  district,
+  subdistrict,
+  province,
+  postal_code,
+}) {
+  const parts = [address_line, subdistrict, district, province, postal_code].filter(Boolean);
   if (!parts.length) return null;
 
   const q = `${parts.join(', ')}, Thailand`;

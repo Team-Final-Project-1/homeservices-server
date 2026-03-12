@@ -21,14 +21,15 @@ async function resolveAddressCoords(addressPayload) {
   }
   return geocodeAddress({
     address_line: addressPayload.address_line,
-    city: addressPayload.city ?? undefined,
+    district: addressPayload.district ?? undefined,
+    subdistrict: addressPayload.subdistrict ?? undefined,
     province: addressPayload.province ?? undefined,
     postal_code: addressPayload.postal_code ?? undefined,
   });
 }
 
 /**
- * Same user + same address_line/city/province/postal_code → reuse row, no duplicate INSERT.
+ * Same user + same address_line/district/subdistrict/province/postal_code → reuse row, no duplicate INSERT.
  */
 async function findOrInsertAddress(userId, addressPayload) {
   const line = String(addressPayload.address_line || '').trim();
@@ -38,7 +39,10 @@ async function findOrInsertAddress(userId, addressPayload) {
   const lat = coords?.latitude ?? null;
   const lng = coords?.longitude ?? null;
 
-  const city = addressPayload.city != null ? String(addressPayload.city).trim() : '';
+  const district =
+    addressPayload.district != null ? String(addressPayload.district).trim() : '';
+  const subdistrict =
+    addressPayload.subdistrict != null ? String(addressPayload.subdistrict).trim() : '';
   const province = addressPayload.province != null ? String(addressPayload.province).trim() : '';
   const postal = addressPayload.postal_code != null ? String(addressPayload.postal_code).trim() : '';
 
@@ -46,11 +50,12 @@ async function findOrInsertAddress(userId, addressPayload) {
     `SELECT id, latitude, longitude FROM addresses
      WHERE user_id = $1
        AND trim(address_line) = $2
-       AND trim(coalesce(city, '')) = $3
-       AND trim(coalesce(province, '')) = $4
-       AND trim(coalesce(postal_code, '')) = $5
+       AND trim(coalesce(district, '')) = $3
+       AND trim(coalesce(subdistrict, '')) = $4
+       AND trim(coalesce(province, '')) = $5
+       AND trim(coalesce(postal_code, '')) = $6
      LIMIT 1`,
-    [userId, line, city, province, postal]
+    [userId, line, district, subdistrict, province, postal]
   );
 
   if (existing.rows.length > 0) {
@@ -72,12 +77,13 @@ async function findOrInsertAddress(userId, addressPayload) {
   }
 
   const ins = await pool.query(
-    `INSERT INTO addresses (user_id, address_line, city, province, postal_code, latitude, longitude)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    `INSERT INTO addresses (user_id, address_line, district, subdistrict, province, postal_code, latitude, longitude)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
     [
       userId,
       addressPayload.address_line,
-      addressPayload.city ?? null,
+      addressPayload.district ?? null,
+      addressPayload.subdistrict ?? null,
       addressPayload.province ?? null,
       addressPayload.postal_code ?? null,
       lat,
@@ -110,7 +116,15 @@ router.get('/addresses', async (req, res) => {
     }
     const userId = userRes.rows[0].id;
     const result = await pool.query(
-      `SELECT id, address_line, city, province, postal_code, latitude, longitude, created_at
+      `SELECT id,
+              address_line,
+              district,
+              subdistrict,
+              province,
+              postal_code,
+              latitude,
+              longitude,
+              created_at
        FROM addresses
        WHERE user_id = $1
        ORDER BY created_at DESC`,
@@ -126,7 +140,7 @@ router.get('/addresses', async (req, res) => {
 /**
  * POST /api/payment/addresses/coords
  * Update latitude/longitude on an existing address row only (no INSERT).
- * Body: { authUserId, addressId?, address_line, city?, province?, postal_code?, latitude, longitude }
+ * Body: { authUserId, addressId?, address_line, district?, subdistrict?, province?, postal_code?, latitude, longitude }
  * - If addressId is set: UPDATE that row when it belongs to the user.
  * - Else: find row by same normalized fields as findOrInsertAddress; UPDATE if found (404 if no row).
  */
@@ -166,7 +180,10 @@ router.post('/addresses/coords', express.json(), async (req, res) => {
     if (!line) {
       return res.status(400).json({ error: 'address_line is required when addressId is omitted.' });
     }
-    const city = req.body?.city != null ? String(req.body.city).trim() : '';
+    const district =
+      req.body?.district != null ? String(req.body.district).trim() : '';
+    const subdistrict =
+      req.body?.subdistrict != null ? String(req.body.subdistrict).trim() : '';
     const province = req.body?.province != null ? String(req.body.province).trim() : '';
     const postal = req.body?.postal_code != null ? String(req.body.postal_code).trim() : '';
 
@@ -174,11 +191,12 @@ router.post('/addresses/coords', express.json(), async (req, res) => {
       `SELECT id FROM addresses
        WHERE user_id = $1
          AND trim(address_line) = $2
-         AND trim(coalesce(city, '')) = $3
-         AND trim(coalesce(province, '')) = $4
-         AND trim(coalesce(postal_code, '')) = $5
+         AND trim(coalesce(district, '')) = $3
+         AND trim(coalesce(subdistrict, '')) = $4
+         AND trim(coalesce(province, '')) = $5
+         AND trim(coalesce(postal_code, '')) = $6
        LIMIT 1`,
-      [userId, line, city, province, postal]
+      [userId, line, district, subdistrict, province, postal]
     );
     if (existing.rows.length === 0) {
       return res.status(404).json({
@@ -272,7 +290,7 @@ router.get('/promotion/validate', async (req, res) => {
  * Body: {
  *   authUserId: string (Supabase auth user UUID),
  *   addressId?: number (optional if address is provided),
- *   address?: { address_line, city?, province?, postal_code? } (optional, used to create address if addressId not set),
+ *   address?: { address_line, district?, subdistrict?, province?, postal_code? } (optional, used to create address if addressId not set),
  *   promotionId?: number,
  *   items: [{ serviceId, name, quantity, price }],
  *   discountAmount: number,
@@ -435,7 +453,7 @@ router.post('/create-checkout-session', express.json(), async (req, res) => {
  * Body: {
  *   authUserId: string (Supabase auth user UUID),
  *   addressId?: number,
- *   address?: { address_line, city?, province?, postal_code? },
+ *   address?: { address_line, district?, subdistrict?, province?, postal_code? },
  *   promotionId?: number,
  *   items: [{ serviceId, name, quantity, price }],
  *   discountAmount: number

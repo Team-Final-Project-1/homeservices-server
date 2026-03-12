@@ -220,8 +220,10 @@ authRouter.get("/get-user", protectUser, async (req, res) => {
       return res.status(404).json({ error: "User profile not found" });
     }
     console.log("DB rows[0]:", rows[0]);
+    // Return both internal numeric user id and Supabase auth user id
     res.status(200).json({
-      id: data.user.id,
+      id: rows[0].id, // internal users.id (number)
+      auth_user_id: data.user.id, // Supabase auth user UUID
       email: rows[0].email,
       username: rows[0].username,
       role: rows[0].role,
