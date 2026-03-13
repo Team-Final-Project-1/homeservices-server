@@ -856,7 +856,8 @@ export async function stripeWebhookHandler(req, res) {
  * POST /api/payment/intent/mark-paid
  * Fallback endpoint to mark a PaymentIntent-based order as completed
  * after client-side confirmation, in case webhooks are not configured.
- * Body: { authUserId: string, orderId: number }
+ * Body: { authUserId: string, orderId: number, cartItemId?: number }
+ * If cartItemId is provided, the cart item is deleted after marking the order paid.
  */
 router.post('/intent/mark-paid', express.json(), async (req, res) => {
   if (!stripe) {
@@ -864,7 +865,7 @@ router.post('/intent/mark-paid', express.json(), async (req, res) => {
   }
 
   try {
-    const { authUserId, orderId } = req.body;
+    const { authUserId, orderId, cartItemId } = req.body;
     if (!authUserId || !orderId) {
       return res.status(400).json({
         error: 'Missing required fields: authUserId, orderId',
@@ -907,6 +908,12 @@ router.post('/intent/mark-paid', express.json(), async (req, res) => {
       [orderId]
     );
     await incrementPromotionUsageForOrder(orderId);
+
+    if (cartItemId != null && Number.isFinite(Number(cartItemId))) {
+      const cid = Number(cartItemId);
+      await pool.query('DELETE FROM cart_item_details WHERE cart_item_id = $1', [cid]);
+      await pool.query('DELETE FROM cart_items WHERE id = $1 AND user_id = $2', [cid, userId]);
+    }
 
     res.status(200).json({ success: true });
   } catch (err) {

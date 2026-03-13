@@ -10,6 +10,7 @@ import authRoute from "./routes/authRoute.mjs";
 import technicianHistoryRoute from "./routes/technicianHistoryRoute.mjs";
 import orderRoute from "./routes/orderRoute.mjs";
 import promotionRouter from './routes/promotionRoute.mjs';
+import cartRoute from "./routes/cartRoute.mjs";
 
 const app = experss();
 const PORT = process.env.PORT || 4000;
@@ -42,6 +43,7 @@ app.use("/api/auth", authRoute);
 app.use("/api/orders", orderRoute);
 app.use("/api/technician", technicianHistoryRoute);
 app.use('/api/promotions', promotionRouter);
+app.use("/api/cart", cartRoute);
 
 app.use("/api/technician-profile", technicianProfileRoute);
 
