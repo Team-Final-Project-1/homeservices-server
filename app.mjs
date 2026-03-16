@@ -1,4 +1,4 @@
-import experss from "express";
+import express from "express";
 import cors from "cors";
 import "dotenv/config";
 import ServiceRoute from "./routes/serviceRoute.mjs";
@@ -14,18 +14,19 @@ import cartRoute from "./routes/cartRoute.mjs";
 import technicianOrderRoute from "./routes/technicianOrderRoute.mjs";
 import technicianPendingRoute from "./routes/technicianPendingRoute.mjs";
 
+import userRoute from './routes/userRoute.mjs';
 
-const app = experss();
+const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Stripe webhook needs raw body for signature verification (must be before express.json())
 app.post(
   "/api/payment/webhook",
-  experss.raw({ type: "application/json" }),
+  express.raw({ type: "application/json" }), // ✅ แก้แล้ว
   stripeWebhookHandler
 );
 
-app.use(experss.json());
+app.use(express.json());
 app.use(
   cors({
     origin: [
@@ -47,6 +48,7 @@ app.use("/api/orders", orderRoute);
 app.use("/api/technician", technicianHistoryRoute);
 app.use('/api/promotions', promotionRouter);
 app.use("/api/cart", cartRoute);
+app.use('/api/users', userRoute);
 
 app.use("/api/technician-profile", technicianProfileRoute);
 
