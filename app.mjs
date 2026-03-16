@@ -9,6 +9,8 @@ import "dotenv/config"
 import http from "http"
 import { Server } from "socket.io"
 
+import { startChatCleanup } from "./utils/chatCleanup.mjs"
+
 // ======================================================
 // ROUTES
 // ======================================================
@@ -75,7 +77,6 @@ io.on("connection", (socket) => {
 
       if (!userId) return
 
-      // remove old socket if exists
       const oldSocket = onlineUsers.get(userId)
 
       if (oldSocket && oldSocket !== socket.id) {
@@ -144,12 +145,36 @@ io.on("connection", (socket) => {
   })
 
   // ==============================================
+  // CLOSE CHAT ROOM
+  // ==============================================
+
+  socket.on("close_room", (orderId) => {
+
+    try {
+
+      if (!orderId) return
+
+      console.log("🚪 Closing chat room:", orderId)
+
+      io.to(orderId).emit("chat_closed")
+
+    } catch (err) {
+
+      console.error("close room error:", err)
+
+    }
+
+  })
+
+  // ==============================================
   // TYPING
   // ==============================================
 
   socket.on("typing", ({ orderId, userId }) => {
 
     try {
+
+      if (!orderId) return
 
       socket.to(orderId).emit("typing", { userId })
 
@@ -164,6 +189,8 @@ io.on("connection", (socket) => {
   socket.on("stop_typing", ({ orderId }) => {
 
     try {
+
+      if (!orderId) return
 
       socket.to(orderId).emit("stop_typing")
 
@@ -274,6 +301,12 @@ app.use("/api", messagesRoute)
 app.get("/test", (req, res) => {
   res.status(200).json({ message: "Hello World!" })
 })
+
+// ======================================================
+// START CRON JOB
+// ======================================================
+
+startChatCleanup()
 
 // ======================================================
 // START SERVER

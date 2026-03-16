@@ -12,13 +12,9 @@ router.post("/messages", async (req, res) => {
 
   try {
 
-    console.log("BODY:", req.body)
-
     const { order_id, sender_id, message } = req.body
 
-    if (!order_id || !sender_id || !message) {
-
-      console.log("❌ Missing required fields")
+    if (!order_id || !sender_id || !message || message.trim() === "") {
 
       return res.status(400).json({
         error: "Missing required fields"
@@ -44,19 +40,17 @@ router.post("/messages", async (req, res) => {
 
     if (error) {
 
-      console.log("❌ SUPABASE ERROR:", error)
+      console.error("❌ SUPABASE INSERT ERROR:", error)
 
       return res.status(400).json(error)
 
     }
 
-    console.log("✅ Message inserted:", data)
-
     res.json(data[0])
 
   } catch (err) {
 
-    console.log("❌ SERVER ERROR:", err)
+    console.error("❌ SERVER ERROR:", err)
 
     res.status(500).json({
       error: "Send message failed"
@@ -103,7 +97,7 @@ router.post("/messages/image", async (req, res) => {
 
     if (error) {
 
-      console.log("❌ IMAGE INSERT ERROR:", error)
+      console.error("❌ IMAGE INSERT ERROR:", error)
 
       return res.status(400).json(error)
 
@@ -113,7 +107,7 @@ router.post("/messages/image", async (req, res) => {
 
   } catch (err) {
 
-    console.log("❌ SERVER ERROR:", err)
+    console.error("❌ SERVER ERROR:", err)
 
     res.status(500).json({
       error: "Send image failed"
@@ -133,6 +127,14 @@ router.get("/messages/:orderId", async (req, res) => {
   try {
 
     const { orderId } = req.params
+
+    if (!orderId) {
+
+      return res.status(400).json({
+        error: "orderId required"
+      })
+
+    }
 
     let page = parseInt(req.query.page)
 
@@ -154,7 +156,7 @@ router.get("/messages/:orderId", async (req, res) => {
 
     if (error) {
 
-      console.log("❌ LOAD ERROR:", error)
+      console.error("❌ LOAD ERROR:", error)
 
       return res.status(400).json(error)
 
@@ -164,7 +166,7 @@ router.get("/messages/:orderId", async (req, res) => {
 
   } catch (err) {
 
-    console.log("❌ SERVER ERROR:", err)
+    console.error("❌ SERVER ERROR:", err)
 
     res.status(500).json({
       error: "Load messages failed"
@@ -186,10 +188,10 @@ router.put("/messages/read/:orderId", async (req, res) => {
     const { orderId } = req.params
     const { userId } = req.body
 
-    if (!userId) {
+    if (!orderId || !userId) {
 
       return res.status(400).json({
-        error: "userId is required"
+        error: "orderId and userId required"
       })
 
     }
@@ -204,7 +206,7 @@ router.put("/messages/read/:orderId", async (req, res) => {
 
     if (error) {
 
-      console.log("❌ UPDATE ERROR:", error)
+      console.error("❌ UPDATE ERROR:", error)
 
       return res.status(400).json(error)
 
@@ -216,10 +218,109 @@ router.put("/messages/read/:orderId", async (req, res) => {
 
   } catch (err) {
 
-    console.log("❌ SERVER ERROR:", err)
+    console.error("❌ SERVER ERROR:", err)
 
     res.status(500).json({
       error: "Update read status failed"
+    })
+
+  }
+
+})
+
+
+// =============================
+// DELETE CHAT WHEN JOB COMPLETE
+// =============================
+
+router.delete("/messages/order/:orderId", async (req, res) => {
+
+  try {
+
+    const { orderId } = req.params
+
+    if (!orderId) {
+
+      return res.status(400).json({
+        error: "orderId required"
+      })
+
+    }
+
+    const supabase = getSupabase()
+
+    const { error } = await supabase
+      .from("messages")
+      .delete()
+      .eq("order_id", orderId)
+
+    if (error) {
+
+      console.error("❌ DELETE CHAT ERROR:", error)
+
+      return res.status(400).json(error)
+
+    }
+
+    res.json({
+      success: true
+    })
+
+  } catch (err) {
+
+    console.error("❌ SERVER ERROR:", err)
+
+    res.status(500).json({
+      error: "Delete chat failed"
+    })
+
+  }
+
+})
+
+// =============================
+// GET UNREAD MESSAGE COUNT
+// =============================
+
+router.get("/messages/unread/:orderId/:userId", async (req, res) => {
+
+  try {
+
+    const { orderId, userId } = req.params
+
+    if (!orderId || !userId) {
+
+      return res.status(400).json({
+        error: "orderId and userId required"
+      })
+
+    }
+
+    const supabase = getSupabase()
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("order_id", orderId)
+      .eq("is_read", false)
+      .neq("sender_id", userId)
+
+    if (error) {
+
+      return res.status(400).json(error)
+
+    }
+
+    res.json({
+      count: data.length
+    })
+
+  } catch (err) {
+
+    console.error(err)
+
+    res.status(500).json({
+      error: "Unread count failed"
     })
 
   }

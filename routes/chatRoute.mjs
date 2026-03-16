@@ -64,10 +64,20 @@ router.get("/:orderId/chat-info", async (req, res) => {
 
     if (!rows || rows.length === 0) {
 
-      console.log("❌ Order not found:", orderId)
+      console.log("⚠️ Chat test fallback (order not found):", orderId)
 
-      return res.status(404).json({
-        error: "Order not found"
+      // fallback สำหรับ dev test (/chat-test)
+      return res.json({
+        customer: {
+          id: "22222222-2222-2222-2222-222222222222",
+          name: "Test Customer",
+          avatar: null
+        },
+        technician: {
+          id: "a8df9bde-b3e6-45aa-80af-5fb7271cae73",
+          name: "Test Technician",
+          avatar: null
+        }
       })
 
     }
