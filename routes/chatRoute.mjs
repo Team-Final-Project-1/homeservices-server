@@ -23,6 +23,17 @@ router.get("/:orderId/chat-info", async (req, res) => {
       })
     }
 
+    // กัน format มั่ว
+    if (!/^[0-9a-fA-F-]{36}$/.test(orderId)) {
+      return res.status(400).json({
+        error: "Invalid orderId format"
+      })
+    }
+
+    // ============================
+    // QUERY
+    // ============================
+
     const query = `
       SELECT
         o.id AS order_id,
@@ -64,20 +75,10 @@ router.get("/:orderId/chat-info", async (req, res) => {
 
     if (!rows || rows.length === 0) {
 
-      console.log("⚠️ Chat test fallback (order not found):", orderId)
+      console.log("❌ Order not found:", orderId)
 
-      // fallback สำหรับ dev test (/chat-test)
-      return res.json({
-        customer: {
-          id: "22222222-2222-2222-2222-222222222222",
-          name: "Test Customer",
-          avatar: null
-        },
-        technician: {
-          id: "a8df9bde-b3e6-45aa-80af-5fb7271cae73",
-          name: "Test Technician",
-          avatar: null
-        }
+      return res.status(404).json({
+        error: "Order not found"
       })
 
     }
@@ -85,7 +86,7 @@ router.get("/:orderId/chat-info", async (req, res) => {
     const row = rows[0]
 
     // ============================
-    // CUSTOMER OBJECT
+    // CUSTOMER
     // ============================
 
     const customer = {
@@ -95,7 +96,7 @@ router.get("/:orderId/chat-info", async (req, res) => {
     }
 
     // ============================
-    // TECHNICIAN OBJECT
+    // TECHNICIAN
     // ============================
 
     const technician = row.technician_id

@@ -12,23 +12,45 @@ export const startChatCleanup = () => {
 
       const supabase = getSupabase()
 
-      const sevenDaysAgo = new Date()
+      // ลบเฉพาะ chat ของงานที่ "เสร็จแล้ว"
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      // ==============================
+      //  หา order ที่ completed
+      // ==============================
 
-      const { error } = await supabase
+      const { data: orders, error: orderError } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("service_status", "completed")
+
+      if (orderError) {
+        console.error("❌ Fetch orders error:", orderError)
+        return
+      }
+
+      if (!orders || orders.length === 0) {
+        console.log("ℹ️ No completed orders found")
+        return
+      }
+
+      const orderIds = orders.map(o => o.id)
+
+      // ==============================
+      //  ลบ messages ของ order เหล่านั้น
+      // ==============================
+
+      const { error: deleteError } = await supabase
         .from("messages")
         .delete()
-        .lt("created_at", sevenDaysAgo.toISOString())
+        .in("order_id", orderIds)
+        .lt("created_at", thirtyDaysAgo.toISOString())
 
-      if (error) {
-
-        console.error("❌ Chat cleanup error:", error)
-
+      if (deleteError) {
+        console.error("❌ Chat cleanup error:", deleteError)
       } else {
-
-        console.log("✅ Old chat deleted")
-
+        console.log("✅ Old completed chat deleted")
       }
 
     } catch (err) {
