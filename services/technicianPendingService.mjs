@@ -166,6 +166,27 @@ export async function completeJob(orderId, technicianId) {
       [orderId, technicianId],
     );
 
+    // ดึงข้อมูลลูกค้าและชื่อช่าง
+    const orderResult = await client.query(
+      `SELECT o.user_id, u.full_name
+       FROM orders o
+       JOIN users u ON u.id = $2
+       WHERE o.id = $1`,
+      [orderId, technicianId],
+    );
+
+    if (orderResult.rows.length > 0) {
+      const { user_id, full_name } = orderResult.rows[0];
+      const technicianName = full_name?.trim() || "ช่าง";
+
+      // INSERT notification ให้ลูกค้า
+      await client.query(
+        `INSERT INTO notifications (user_id, order_id, type, message)
+         VALUES ($1, $2, 'order_completed', $3)`,
+        [user_id, orderId, `${technicianName} ดำเนินการเสร็จสิ้นแล้ว`],
+      );
+    }
+
     await client.query("COMMIT");
     return { success: true };
   } catch (error) {
@@ -181,30 +202,52 @@ export async function completeJob(orderId, technicianId) {
 ========================================================= */
 
 export async function getCounters(technicianId) {
-  const query = `
-    SELECT
-      COUNT(*) FILTER (
-        WHERE o.service_status = 'in_progress'
-        AND ta.technician_id = $1
-        AND ta.status = 'assigned'
-      ) AS in_progress,
+  const client = await pool.connect();
+  try {
+    // นับงานที่รอรับ (pending)
+    const pendingResult = await client.query(
+      `SELECT COUNT(*) AS pending
+       FROM orders o
+       WHERE o.status = 'completed'
+         AND (o.service_status IS NULL OR o.service_status = 'pending')
+         AND NOT EXISTS (
+           SELECT 1 FROM technician_assignments ta
+           WHERE ta.order_id = o.id AND ta.status = 'assigned'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM technician_assignments ta
+           WHERE ta.order_id = o.id
+             AND ta.technician_id = $1
+             AND ta.status = 'rejected'
+         )
+         AND EXISTS (
+           SELECT 1
+           FROM order_items oi
+           JOIN technician_services ts ON oi.service_id = ts.service_id
+           WHERE oi.order_id = o.id
+             AND ts.technician_id = $1
+         )`,
+      [technicianId],
+    );
 
-      COUNT(*) FILTER (
-        WHERE o.service_status = 'completed'
-        AND ta.technician_id = $1
-        AND ta.status = 'completed'
-      ) AS completed
+    // นับงานที่กำลังดำเนินการ (in_progress)
+    const inProgressResult = await client.query(
+      `SELECT COUNT(*) AS in_progress
+       FROM orders o
+       JOIN technician_assignments ta
+         ON ta.order_id = o.id
+         AND ta.technician_id = $1
+         AND ta.status = 'assigned'
+       WHERE o.service_status = 'in_progress'`,
+      [technicianId],
+    );
 
-    FROM orders o
-    JOIN technician_assignments ta ON ta.order_id = o.id
-    WHERE ta.technician_id = $1
-  `;
-
-  const { rows } = await pool.query(query, [technicianId]);
-  const result = rows[0];
-
-  return {
-    in_progress: Number(result.in_progress ?? 0),
-    completed: Number(result.completed ?? 0),
-  };
+    return {
+      pending: Number(pendingResult.rows[0].pending ?? 0),
+      in_progress: Number(inProgressResult.rows[0].in_progress ?? 0),
+      completed: 0, // ไม่แสดง badge ตาม requirement
+    };
+  } finally {
+    client.release();
+  }
 }
