@@ -5,7 +5,6 @@ import pool from "../utils/db.mjs";
 ========================================================= */
 
 export async function getPendingJobs(technicianId) {
-
   const query = `
 SELECT
   o.id,
@@ -13,7 +12,6 @@ SELECT
   o.created_at,
   o.net_price,
 
-  -- ✅ FIX --
   (o.appointment_date::timestamp + COALESCE(o.appointment_time, '00:00:00')) 
     AS appointment_datetime,
 
@@ -23,7 +21,6 @@ SELECT
 
   a.address_line,
 
-  -- ✅ MAP
   a.latitude AS customer_lat,
   a.longitude AS customer_lng,
 
@@ -68,19 +65,14 @@ ORDER BY ta.assigned_at DESC
 
   const { rows } = await pool.query(query, [technicianId]);
 
-  console.log("PENDING JOBS:", rows);
-
   return rows;
 }
-
-
 
 /* =========================================================
    GET JOB DETAIL
 ========================================================= */
 
 export async function getJobDetail(orderId, technicianId) {
-
   const query = `
 SELECT
   o.id,
@@ -137,101 +129,82 @@ GROUP BY
 
   const { rows } = await pool.query(query, [orderId, technicianId]);
 
-  console.log("JOB DETAIL:", rows[0]); // 🔥 debug
-
   return rows[0];
 }
-
-
 
 /* =========================================================
    COMPLETE JOB
 ========================================================= */
 
 export async function completeJob(orderId, technicianId) {
-
   const client = await pool.connect();
 
   try {
-
     await client.query("BEGIN");
 
-    const orderUpdate = await client.query(
-      `
-      UPDATE orders
-      SET service_status = 'completed'
-      WHERE id = $1
-      RETURNING id
-      `,
-      [orderId]
+    const check = await client.query(
+      `SELECT 1 FROM technician_assignments
+       WHERE order_id = $1 AND technician_id = $2 AND status = 'assigned'`,
+      [orderId, technicianId],
     );
 
-    if (orderUpdate.rowCount === 0) {
-      throw new Error("Order not found");
+    if (check.rows.length === 0) {
+      await client.query("ROLLBACK");
+      throw new Error("ไม่มีสิทธิ์อัปเดตงานนี้");
     }
 
     await client.query(
-      `
-      UPDATE technician_assignments
-      SET status = 'completed',
-          completed_at = NOW()
-      WHERE order_id = $1
-      AND technician_id = $2
-      `,
-      [orderId, technicianId]
+      `UPDATE orders SET service_status = 'completed', updated_at = NOW()
+       WHERE id = $1`,
+      [orderId],
+    );
+
+    await client.query(
+      `UPDATE technician_assignments
+       SET status = 'completed', completed_at = NOW()
+       WHERE order_id = $1 AND technician_id = $2`,
+      [orderId, technicianId],
     );
 
     await client.query("COMMIT");
-
     return { success: true };
-
   } catch (error) {
-
     await client.query("ROLLBACK");
     throw error;
-
   } finally {
-
     client.release();
-
   }
 }
-
-
 
 /* =========================================================
    GET COUNTERS
 ========================================================= */
 
 export async function getCounters(technicianId) {
-
   const query = `
-SELECT
-  COUNT(*) FILTER (WHERE o.service_status = 'pending') AS pending,
+    SELECT
+      COUNT(*) FILTER (
+        WHERE o.service_status = 'in_progress'
+        AND ta.technician_id = $1
+        AND ta.status = 'assigned'
+      ) AS in_progress,
 
-  COUNT(*) FILTER (
-    WHERE o.service_status = 'in_progress'
-    AND ta.technician_id = $1
-  ) AS in_progress,
+      COUNT(*) FILTER (
+        WHERE o.service_status = 'completed'
+        AND ta.technician_id = $1
+        AND ta.status = 'completed'
+      ) AS completed
 
-  COUNT(*) FILTER (
-    WHERE o.service_status = 'completed'
-    AND ta.technician_id = $1
-  ) AS completed
-
-FROM orders o
-
-LEFT JOIN technician_assignments ta
-ON ta.order_id = o.id
-`;
+    FROM orders o
+    JOIN technician_assignments ta ON ta.order_id = o.id
+    WHERE ta.technician_id = $1
+  `;
 
   const { rows } = await pool.query(query, [technicianId]);
-
   const result = rows[0];
 
   return {
-    pending: Number(result.pending),
-    in_progress: Number(result.in_progress),
-    completed: Number(result.completed),
+    in_progress: Number(result.in_progress ?? 0),
+    completed: Number(result.completed ?? 0),
   };
 }

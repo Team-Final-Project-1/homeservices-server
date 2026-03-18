@@ -68,6 +68,7 @@ const technicianProfileServices = {
       `UPDATE users
         SET first_name = $1,
             last_name = $2,
+            full_name = $1 || ' ' || $2,
             phone = $3,
             updated_at = NOW()
         WHERE id = $4 AND role = 'technician'`,

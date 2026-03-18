@@ -40,6 +40,7 @@ const technicianOrderService = {
       JOIN users u ON o.user_id = u.id
 
       WHERE o.status = 'completed'
+        AND (o.service_status IS NULL OR o.service_status = 'pending')
 
         AND NOT EXISTS (
           SELECT 1 FROM technician_assignments ta
@@ -53,7 +54,6 @@ const technicianOrderService = {
             AND ta.status = 'rejected'
         )
 
-        -- กรองบริการที่ช่างรับได้
         AND EXISTS (
           SELECT 1
           FROM order_items oi2
@@ -62,7 +62,6 @@ const technicianOrderService = {
             AND ts.technician_id = $1
         )
 
-        -- กรอง NULL ออก ถ้าไม่มี lat/lng → คำนวณไม่ได้ → ไม่แสดง
         AND a.latitude IS NOT NULL
         AND a.longitude IS NOT NULL
         AND up.latitude IS NOT NULL
@@ -71,12 +70,10 @@ const technicianOrderService = {
       GROUP BY o.id, o.status, o.net_price, o.created_at,
                o.appointment_date, o.appointment_time, o.remark,
                a.address_line,
-               a.latitude, a.longitude,    -- ✅ เพิ่มใน GROUP BY
-               up.latitude, up.longitude,   -- ✅ เพิ่มใน GROUP BY
+               a.latitude, a.longitude,
+               up.latitude, up.longitude,
                u.full_name, u.phone
 
-      -- ✅ จุดที่ 4: กรองเฉพาะ order ที่อยู่ในรัศมีที่กำหนด
-      -- HAVING ใช้แทน WHERE สำหรับ aggregate หรือค่าที่คำนวณ
       HAVING (6371 * acos(
         LEAST(1.0,
           cos(radians(up.latitude::float)) * cos(radians(a.latitude::float)) *
@@ -109,7 +106,7 @@ const technicianOrderService = {
       customer_phone: order.customer_phone ?? "-",
     }));
   },
-  
+
   acceptOrder: async (orderId, technicianId) => {
     const client = await pool.connect();
     try {
