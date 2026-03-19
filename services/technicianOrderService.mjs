@@ -13,7 +13,7 @@ const technicianOrderService = {
         o.appointment_time,
         o.remark,
         CONCAT('AD', LPAD(o.id::TEXT, 8, '0')) AS order_code,
-        a.address_line,
+        CONCAT_WS(' ', a.address_line, a.subdistrict, a.district, a.province, a.postal_code) AS address_line,
         a.latitude AS customer_lat,
         a.longitude AS customer_lng,
 
@@ -68,11 +68,15 @@ const technicianOrderService = {
         AND up.longitude IS NOT NULL
 
       GROUP BY o.id, o.status, o.net_price, o.created_at,
-               o.appointment_date, o.appointment_time, o.remark,
-               a.address_line,
-               a.latitude, a.longitude,
-               up.latitude, up.longitude,
-               u.full_name, u.phone
+         o.appointment_date, o.appointment_time, o.remark,
+         a.address_line,
+         a.subdistrict,
+         a.district,
+         a.province,
+         a.postal_code,
+         a.latitude, a.longitude,
+         up.latitude, up.longitude,
+         u.full_name, u.phone
 
       HAVING (6371 * acos(
         LEAST(1.0,
