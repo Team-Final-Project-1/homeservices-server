@@ -136,6 +136,21 @@ serviceRouter.get("/", async (req, res) => {
   }
 });
 
+serviceRouter.get("/price-range", async (req, res) => {
+  try {
+    const { rows } = await connectionPool.query(`
+      SELECT 
+        FLOOR(MIN(price_per_unit)) AS min_price,
+        CEIL(MAX(price_per_unit))  AS max_price
+      FROM service_items
+    `);
+    res.status(200).json(rows[0]);
+  } catch (error) {
+    console.error("Error fetching price range:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 serviceRouter.get("/:id", async (req, res) => {
   const { id } = req.params;
   try {
