@@ -112,10 +112,6 @@ app.use("/api/chat", chatRoute);
 app.use("/api/chat", messagesRoute);
 
 
-//TEST ROUTE
-app.get("/test", (req, res) => {
-  res.status(200).json({ message: "Hello World!" })
-})
 
 // ======================================================
 // START CRON JOB
