@@ -1,8 +1,8 @@
 import { sendMessage, validateChatAccess } from "../services/chatService.mjs"
+import pool from "../utils/db.mjs"
 
 export const initSocket = (io) => {
 
-  // รองรับหลาย device ต่อ user
   const onlineUsers = new Map()
 
   io.on("connection", (socket) => {
@@ -13,57 +13,82 @@ export const initSocket = (io) => {
     // USER ONLINE
     // =============================
     socket.on("user_online", ({ userId }) => {
+
       if (!userId) return
 
-      if (!onlineUsers.has(userId)) {
-        onlineUsers.set(userId, new Set())
+      if (!onlineUsers.has(String(userId))) {
+        onlineUsers.set(String(userId), new Set())
       }
 
-      onlineUsers.get(userId).add(socket.id)
+      onlineUsers.get(String(userId)).add(socket.id)
+
+      console.log("🟢 user online:", userId)
 
       io.emit("online_users", Array.from(onlineUsers.keys()))
     })
 
 
     // =============================
-    // JOIN ROOM
+    // JOIN CHAT
     // =============================
-    socket.on("join_room", async ({ orderId, userId }) => {
+    socket.on("join_chat", async ({ order_id, user_id }) => {
+
       try {
 
-        if (!orderId || !userId) return
+        if (!order_id || !user_id) return
 
-        // เช็คสิทธิ์ก่อน join
-        await validateChatAccess(orderId, userId)
+        await validateChatAccess(order_id, user_id)
 
-        socket.join(String(orderId))
+        socket.join(String(order_id))
+
+        socket.emit("joined_chat", {
+          order_id: String(order_id)
+        })
 
       } catch (err) {
-        console.log("❌ join denied:", err.message)
-        socket.emit("error", "Unauthorized")
+        socket.emit("error", err.message)
       }
     })
 
 
     // =============================
-    // SEND MESSAGE (สำคัญสุด)
+    // SEND MESSAGE
     // =============================
     socket.on("send_message", async (data) => {
+
+      const { order_id, sender_id, message, image } = data
+
       try {
 
-        const { order_id, sender_id, message } = data
+        if (!order_id || !sender_id) return
+        if (!message && !image) return
 
-        if (!order_id || !sender_id || !message?.trim()) return
-
-        // save DB ก่อน
         const savedMessage = await sendMessage({
           order_id,
           sender_id,
-          message: message.trim()
+          message: message?.trim() || null,
+          image: image || null
         })
 
-        //  broadcast
-        io.to(String(order_id)).emit("receive_message", savedMessage)
+        // =====================================
+        // map UUID → INT
+        // =====================================
+        const { rows } = await pool.query(`
+          SELECT id
+          FROM users
+          WHERE auth_user_id = $1
+        `, [savedMessage.sender_id])
+
+        const senderIdInt = rows[0]?.id
+
+        const mappedMessage = {
+          ...savedMessage,
+          sender_id: String(senderIdInt) // 🔥 สำคัญมาก
+        }
+
+        console.log("📤 emit message:", mappedMessage)
+
+        io.to(String(order_id)).emit("receive_message", mappedMessage)
 
       } catch (err) {
         console.log("❌ send_message error:", err.message)
@@ -73,10 +98,30 @@ export const initSocket = (io) => {
 
 
     // =============================
+    // TYPING
+    // =============================
+    socket.on("typing", ({ orderId, userId }) => {
+      socket.to(String(orderId)).emit("typing", userId)
+    })
+
+    socket.on("stop_typing", ({ orderId }) => {
+      socket.to(String(orderId)).emit("stop_typing")
+    })
+
+
+    // =============================
     // CLOSE CHAT
     // =============================
     socket.on("close_room", (orderId) => {
       io.to(String(orderId)).emit("chat_closed")
+    })
+
+
+    // =============================
+    // LEAVE
+    // =============================
+    socket.on("leave_chat", ({ order_id, user_id }) => {
+      socket.leave(String(order_id))
     })
 
 

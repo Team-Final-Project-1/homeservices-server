@@ -126,10 +126,14 @@ const technicianOrderService = {
         [orderId, technicianId],
       );
 
+      //  ลบ technician_id ออก
       await client.query(
-        `UPDATE orders SET service_status = 'in_progress', updated_at = NOW()
+        `UPDATE orders 
+         SET 
+           service_status = 'in_progress',
+           updated_at = NOW()
          WHERE id = $1`,
-        [orderId],
+        [orderId]
       );
 
       const orderResult = await client.query(
