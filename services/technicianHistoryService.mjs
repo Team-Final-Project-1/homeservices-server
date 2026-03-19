@@ -4,7 +4,7 @@ export const getTechnicianHistory = async (technicianId) => {
   try {
     const query = `
       SELECT 
-        s.name AS service_name,
+        (ARRAY_AGG(s.name))[1] AS service_name,
         o.id AS order_id,
         o.created_at AS operation_date,
         o.total_price AS total_price,
@@ -15,6 +15,7 @@ export const getTechnicianHistory = async (technicianId) => {
       JOIN technician_assignments ta ON o.id = ta.order_id
       WHERE ta.technician_id = $1
         AND ta.status = 'completed'
+      GROUP BY o.id, o.created_at, o.total_price, o.status
       ORDER BY o.created_at DESC;
     `;
 
