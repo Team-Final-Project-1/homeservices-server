@@ -119,19 +119,21 @@ export async function getTechnicianDashboard(technicianId) {
       [technicianId],
     );
 
-    // top tasks (services) — จากงานที่ assignment เป็น completed
+    // top tasks (services)
+    // NOTE: ต้องนับ "จำนวนงาน (order)" ที่ทำสำเร็จต่อประเภท
+    // เพราะ join กับ order_items จะทำให้ COUNT(*) บวม (1 order มีหลายรายการได้)
     const topTasksResult = await client.query(
       `SELECT
          s.id::text AS id,
          s.name AS "jobName",
-         COUNT(*)::int AS count
+         COUNT(DISTINCT ta.order_id)::int AS count
        FROM technician_assignments ta
        JOIN order_items oi ON oi.order_id = ta.order_id
        JOIN services s ON s.id = oi.service_id
        WHERE ta.technician_id = $1
          AND ta.status = 'completed'
        GROUP BY s.id, s.name
-       ORDER BY COUNT(*) DESC
+       ORDER BY COUNT(DISTINCT ta.order_id) DESC
        LIMIT 5`,
       [technicianId],
     );
