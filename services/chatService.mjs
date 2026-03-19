@@ -46,7 +46,7 @@ export async function validateChatAccess(order_id, user_id) {
 
   if (!order) throw new Error("Order not found")
 
-  // ❗ เช็คจาก assignment แทน
+  // เช็คจาก assignment แทน
   if (!order.technician_id) {
     throw new Error("Chat not available yet")
   }

@@ -16,7 +16,6 @@ router.post("/", async (req, res) => {
 
     const { order_id, sender_id, message, image } = req.body
 
-    console.log("📩 POST /messages", { order_id, sender_id })
 
     if (!order_id || !sender_id || (!message?.trim() && !image)) {
       return res.status(400).json({ error: "Missing required fields" })
@@ -56,7 +55,6 @@ router.get("/messages/:orderId", async (req, res) => {
     const { orderId } = req.params
     const { userId } = req.query
 
-    console.log("📥 GET messages:", { orderId, userId })
 
     let page = parseInt(req.query.page)
     if (!page || page < 1) page = 1
@@ -81,7 +79,6 @@ router.put("/messages/read/:orderId", async (req, res) => {
     const { orderId } = req.params
     const { userId } = req.body
 
-    console.log("👁️ mark read:", { orderId, userId })
 
     if (!userId) {
       return res.status(400).json({ error: "userId required" })
@@ -105,8 +102,6 @@ router.get("/messages/unread/:orderId/:userId", async (req, res) => {
   try {
 
     const { orderId, userId } = req.params
-
-    console.log("📊 unread:", { orderId, userId })
 
     const count = await getUnreadCount(orderId, userId)
 

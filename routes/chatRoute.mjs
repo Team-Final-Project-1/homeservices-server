@@ -7,7 +7,6 @@ router.get("/:orderId/chat-info", async (req, res) => {
   try {
     const { orderId } = req.params
 
-    console.log("📥 chat-info request:", orderId)
 
     if (!orderId) {
       return res.status(400).json({ error: "orderId is required" })

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import pool from "../utils/db.mjs";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -16,7 +17,22 @@ const protectUser = async (req, res, next) => {
     if (error || !data.user) {
       return res.status(401).json({ error: "Unauthorized: Invalid token" });
     }
-    req.user = { ...data.user };
+
+    const { rows } = await pool.query(
+      `SELECT id, role FROM users WHERE auth_user_id = $1`,
+      [data.user.id],
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (rows[0].role !== "user") {
+      return res.status(403).json({ error: "Forbidden: User access only" });
+    }
+
+    // req.user.id = DB integer id, req.user.sub = Supabase UUID (auth_user_id)
+    req.user = { ...data.user, id: rows[0].id, role: rows[0].role };
     next();
   } catch (err) {
     console.error("Error in protectUser middleware:", err);

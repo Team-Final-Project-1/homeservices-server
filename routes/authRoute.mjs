@@ -4,6 +4,7 @@ import pool from "../utils/db.mjs";
 import generateUsername from "../utils/generateusername.mjs";
 import { supabaseAdmin } from "../utils/supabaseAdmin.mjs";
 import protectUser from "../middlewares/protectUser.mjs";
+import protectAuth from "../middlewares/protectAuth.mjs";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -174,7 +175,7 @@ authRouter.post("/login", async (req, res) => {
   }
 });
 
-authRouter.get("/get-user", protectUser, async (req, res) => {
+authRouter.get("/get-user", protectAuth, async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) {
     return res.status(401).json({ error: "Unauthorized: Token missing" });
@@ -219,7 +220,7 @@ authRouter.get("/get-user", protectUser, async (req, res) => {
   }
 });
 
-authRouter.put("/reset-password", protectUser, async (req, res) => {
+authRouter.put("/reset-password", protectAuth, async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   const { oldPassword, newPassword } = req.body;
   if (!token) {
