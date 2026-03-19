@@ -35,7 +35,7 @@ const technicianOrderService = {
       LEFT JOIN addresses a ON o.address_id = a.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN services s ON oi.service_id = s.id
-      LEFT JOIN service_items si ON s.id = si.service_id
+      LEFT JOIN service_items si ON si.id = oi.service_item_id
       JOIN user_profiles up ON up.user_id = $1
       JOIN users u ON o.user_id = u.id
 
@@ -82,7 +82,7 @@ const technicianOrderService = {
         )
       )) <= $2
 
-      ORDER BY distance_km ASC
+      ORDER BY o.created_at DESC
       `,
       [technicianId, radiusKm],
     );
@@ -180,17 +180,3 @@ const technicianOrderService = {
 };
 
 export default technicianOrderService;
-
-// ✅ getAvailableOrders
-//    - กรองบริการที่ช่างรับได้ (technician_services)
-//    - กรองงานที่ปฏิเสธไปแล้ว (rejected)
-//    - กรองรัศมี 10 กม. ด้วย Haversine
-//    - เรียงจากใกล้ไปไกล
-//    - ส่ง customer_lat, customer_lng, distance_km ไปด้วย
-
-// ✅ acceptOrder
-//    - Transaction ป้องกัน race condition
-//    - UPDATE service_status = 'in_progress'
-
-// ✅ rejectOrder
-//    - บันทึก rejected ไม่แตะ orders.status

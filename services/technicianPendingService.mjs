@@ -107,7 +107,7 @@ FROM orders o
 JOIN technician_assignments ta
   ON ta.order_id = o.id
   AND ta.technician_id = $2
-  AND ta.status = 'assigned'
+  AND ta.status IN ('assigned', 'completed')
 
 LEFT JOIN addresses a ON o.address_id = a.id
 LEFT JOIN order_items oi ON o.id = oi.order_id
@@ -204,12 +204,17 @@ export async function completeJob(orderId, technicianId) {
 export async function getCounters(technicianId) {
   const client = await pool.connect();
   try {
-    // นับงานที่รอรับ (pending)
     const pendingResult = await client.query(
       `SELECT COUNT(*) AS pending
        FROM orders o
+       LEFT JOIN addresses a ON o.address_id = a.id
+       JOIN user_profiles up ON up.user_id = $1
        WHERE o.status = 'completed'
          AND (o.service_status IS NULL OR o.service_status = 'pending')
+         AND a.latitude IS NOT NULL
+         AND a.longitude IS NOT NULL
+         AND up.latitude IS NOT NULL
+         AND up.longitude IS NOT NULL
          AND NOT EXISTS (
            SELECT 1 FROM technician_assignments ta
            WHERE ta.order_id = o.id AND ta.status = 'assigned'
@@ -221,16 +226,20 @@ export async function getCounters(technicianId) {
              AND ta.status = 'rejected'
          )
          AND EXISTS (
-           SELECT 1
-           FROM order_items oi
+           SELECT 1 FROM order_items oi
            JOIN technician_services ts ON oi.service_id = ts.service_id
-           WHERE oi.order_id = o.id
-             AND ts.technician_id = $1
-         )`,
+           WHERE oi.order_id = o.id AND ts.technician_id = $1
+         )
+         AND (6371 * acos(
+           LEAST(1.0,
+             cos(radians(up.latitude::float)) * cos(radians(a.latitude::float)) *
+             cos(radians(a.longitude::float) - radians(up.longitude::float)) +
+             sin(radians(up.latitude::float)) * sin(radians(a.latitude::float))
+           )
+         )) <= 10`,
       [technicianId],
     );
 
-    // นับงานที่กำลังดำเนินการ (in_progress)
     const inProgressResult = await client.query(
       `SELECT COUNT(*) AS in_progress
        FROM orders o
@@ -245,7 +254,7 @@ export async function getCounters(technicianId) {
     return {
       pending: Number(pendingResult.rows[0].pending ?? 0),
       in_progress: Number(inProgressResult.rows[0].in_progress ?? 0),
-      completed: 0, // ไม่แสดง badge ตาม requirement
+      completed: 0,
     };
   } finally {
     client.release();

@@ -14,6 +14,7 @@ export const getTechnicianHistory = async (technicianId) => {
       JOIN services s ON oi.service_id = s.id
       JOIN technician_assignments ta ON o.id = ta.order_id
       WHERE ta.technician_id = $1
+        AND ta.status = 'completed'
       ORDER BY o.created_at DESC;
     `;
 
@@ -22,15 +23,20 @@ export const getTechnicianHistory = async (technicianId) => {
     // ฟอร์แมตข้อมูลให้ตรงกับ UI ในรูปภาพ
     const formattedHistory = result.rows.map((row) => ({
       service_name: row.service_name,
-      order_code: `AD${String(row.order_id).padStart(8, '0')}`, // ฟอร์แมตเป็น AD04071205
-      date_time: new Date(row.operation_date).toLocaleString('th-TH', { 
-        day: '2-digit', month: '2-digit', year: 'numeric', 
-        hour: '2-digit', minute: '2-digit' 
-      }) + ' น.', // ฟอร์แมตวันที่ 25/04/2563 เวลา 13.00 น.
-      total_price: Number(row.total_price).toLocaleString('th-TH', { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
-      }) + ' ฿' // ฟอร์แมต 1,550.00 ฿
+      order_code: `AD${String(row.order_id).padStart(8, "0")}`, // ฟอร์แมตเป็น AD04071205
+      date_time:
+        new Date(row.operation_date).toLocaleString("th-TH", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }) + " น.", // ฟอร์แมตวันที่ 25/04/2563 เวลา 13.00 น.
+      total_price:
+        Number(row.total_price).toLocaleString("th-TH", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + " ฿", // ฟอร์แมต 1,550.00 ฿
     }));
 
     return formattedHistory;
@@ -84,22 +90,27 @@ export const getTechnicianHistoryDetail = async (orderId) => {
       service_name: row.items[0]?.name, // ใช้ชื่อบริการแรกเป็นหัวข้อ
       category_name: row.category_name,
       items: row.items, // ส่งเป็น array ให้ frontend ไป loop แสดงผล
-      date_time: new Date(row.operation_date).toLocaleString('th-TH', { 
-        day: '2-digit', month: '2-digit', year: 'numeric', 
-        hour: '2-digit', minute: '2-digit' 
-      }) + ' น.',
+      date_time:
+        new Date(row.operation_date).toLocaleString("th-TH", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }) + " น.",
       address: row.address,
       latitude: row.latitude ? Number(row.latitude) : null,
       longitude: row.longitude ? Number(row.longitude) : null,
-      order_code: `AD${String(row.order_id).padStart(8, '0')}`,
-      total_price: Number(row.total_price).toLocaleString('th-TH', { 
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2 
-      }) + ' ฿',
+      order_code: `AD${String(row.order_id).padStart(8, "0")}`,
+      total_price:
+        Number(row.total_price).toLocaleString("th-TH", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }) + " ฿",
       customer_name: row.customer_name,
       customer_phone: row.customer_phone,
       rating: row.rating || 0,
-      review_comment: row.review_comment || "ไม่มีความคิดเห็นจากผู้รับบริการ"
+      review_comment: row.review_comment || "ไม่มีความคิดเห็นจากผู้รับบริการ",
     };
   } catch (error) {
     console.error("Error fetching history detail:", error);

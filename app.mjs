@@ -34,6 +34,7 @@ import messagesRoute from "./routes/messages.mjs"
 import chatRoute from "./routes/chatRoute.mjs"
 import technicianPendingRoute from "./routes/technicianPendingRoute.mjs";
 import notificationRoute from "./routes/notificationRoute.mjs";
+import technicianDashboardRoute from "./routes/technicianDashboardRoute.mjs";
 import userRoute from "./routes/userRoute.mjs";
 
 
@@ -108,6 +109,7 @@ app.use("/api/technician-profile", technicianProfileRoute);
 app.use("/api/technician-orders", technicianOrderRoute);
 app.use("/api/technician", technicianHistoryRoute);
 app.use("/api/technician", technicianPendingRoute);
+app.use("/api/technician-dashboard", technicianDashboardRoute);
 app.use("/api/chat", chatRoute);
 app.use("/api/chat", messagesRoute);
 

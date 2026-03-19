@@ -383,9 +383,15 @@ router.post('/create-checkout-session', express.json(), async (req, res) => {
     // Insert order_items
     for (const it of items) {
       await pool.query(
-        `INSERT INTO order_items (order_id, service_id, quantity, price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, it.serviceId, it.quantity, it.price]
+        `INSERT INTO order_items (order_id, service_id, quantity, price, service_item_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          orderId,
+          Number(it.serviceId),
+          Number(it.quantity),
+          Number(it.price),
+          it.serviceItemId != null ? Number(it.serviceItemId) : null,
+        ]
       );
     }
 
@@ -543,9 +549,15 @@ router.post('/create-payment-intent', express.json(), async (req, res) => {
     // Insert order_items
     for (const it of items) {
       await pool.query(
-        `INSERT INTO order_items (order_id, service_id, quantity, price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, it.serviceId, it.quantity, it.price]
+        `INSERT INTO order_items (order_id, service_id, quantity, price, service_item_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          orderId,
+          Number(it.serviceId),
+          Number(it.quantity),
+          Number(it.price),
+          it.serviceItemId != null ? Number(it.serviceItemId) : null,
+        ]
       );
     }
 
@@ -661,9 +673,15 @@ router.post('/create-promptpay-intent', express.json(), async (req, res) => {
 
     for (const it of items) {
       await pool.query(
-        `INSERT INTO order_items (order_id, service_id, quantity, price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, it.serviceId, it.quantity, it.price]
+        `INSERT INTO order_items (order_id, service_id, quantity, price, service_item_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          orderId,
+          Number(it.serviceId),
+          Number(it.quantity),
+          Number(it.price),
+          it.serviceItemId != null ? Number(it.serviceItemId) : null,
+        ]
       );
     }
 
@@ -764,6 +782,116 @@ router.get('/session/:sessionId', async (req, res) => {
   } catch (err) {
     console.error('Get session error:', err);
     res.status(500).json({ error: err.message || 'Failed to get session.' });
+  }
+});
+
+/**
+ * GET /api/payment/order-detail/:orderId
+ * Returns full order detail for profile order detail modal.
+ * Includes address on orders.address_id and technician from technician_assignments.
+ */
+router.get('/order-detail/:orderId', async (req, res) => {
+  try {
+    const orderId = Number(req.params.orderId);
+    if (!Number.isFinite(orderId)) {
+      return res.status(400).json({ error: 'Invalid orderId.' });
+    }
+
+    const detailRes = await pool.query(
+      `SELECT
+         o.id,
+         o.service_status AS status,
+         o.created_at,
+         o.total_price,
+         o.net_price,
+         o.discount_amount,
+         p.code AS promotion_code,
+         o.appointment_date,
+         o.appointment_time,
+         o.remark,
+         a.address_line,
+         a.district,
+         a.subdistrict,
+         a.province,
+         a.postal_code,
+         ta_pick.technician_id,
+         ta_pick.technician_name,
+         ta_pick.technician_phone
+       FROM orders o
+       LEFT JOIN promotions p ON p.id = o.promotion_id
+       LEFT JOIN addresses a ON a.id = o.address_id
+       LEFT JOIN LATERAL (
+         SELECT
+           ta.technician_id,
+           COALESCE(up.full_name, u.full_name, u.first_name || ' ' || u.last_name, u.username) AS technician_name,
+           COALESCE(up.phone, u.phone) AS technician_phone
+         FROM technician_assignments ta
+         JOIN users u ON u.id = ta.technician_id
+         LEFT JOIN user_profiles up ON up.user_id = ta.technician_id
+         WHERE ta.order_id = o.id
+         ORDER BY ta.assigned_at DESC, ta.id DESC
+         LIMIT 1
+       ) ta_pick ON true
+       WHERE o.id = $1
+       LIMIT 1`,
+      [orderId]
+    );
+
+    if (detailRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+
+    const itemsRes = await pool.query(
+      `SELECT
+         oi.service_id,
+         oi.service_item_id,
+         oi.quantity,
+         oi.price,
+         COALESCE(si.name, s.name, 'Service') AS name,
+         si.unit
+       FROM order_items oi
+       LEFT JOIN service_items si ON si.id = oi.service_item_id
+       LEFT JOIN services s ON s.id = oi.service_id
+       WHERE oi.order_id = $1
+       ORDER BY oi.id ASC`,
+      [orderId]
+    );
+
+    const detail = detailRes.rows[0];
+    const items = itemsRes.rows.map((r) => ({
+      serviceId: Number(r.service_id),
+      serviceItemId: r.service_item_id != null ? Number(r.service_item_id) : null,
+      name: r.name,
+      unit: r.unit ?? null,
+      quantity: Number(r.quantity),
+      price: Number(r.price),
+    }));
+
+    res.status(200).json({
+      id: Number(detail.id),
+      status: detail.status,
+      created_at: detail.created_at,
+      total_price: Number(detail.total_price ?? 0),
+      discount_amount: Number(detail.discount_amount ?? 0),
+      promotion_code: detail.promotion_code ?? null,
+      net_price: Number(detail.net_price ?? 0),
+      appointment_date: detail.appointment_date,
+      appointment_time: detail.appointment_time,
+      remark: detail.remark,
+      address_line: detail.address_line,
+      district: detail.district,
+      subdistrict: detail.subdistrict,
+      province: detail.province,
+      postal_code: detail.postal_code,
+      technician_id: detail.technician_id != null ? Number(detail.technician_id) : null,
+      technician_name: detail.technician_name,
+      technician_phone: detail.technician_phone,
+      services: items.map((it) => it.name),
+      items,
+    });
+  } catch (err) {
+    console.error('Get order detail error:', err);
+    res.status(500).json({ error: err.message || 'Failed to get order detail.' });
   }
 });
 
