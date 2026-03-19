@@ -35,7 +35,7 @@ const technicianOrderService = {
       LEFT JOIN addresses a ON o.address_id = a.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN services s ON oi.service_id = s.id
-      LEFT JOIN service_items si ON s.id = si.service_id
+      LEFT JOIN service_items si ON si.id = oi.service_item_id
       JOIN user_profiles up ON up.user_id = $1
       JOIN users u ON o.user_id = u.id
 
