@@ -383,9 +383,15 @@ router.post('/create-checkout-session', express.json(), async (req, res) => {
     // Insert order_items
     for (const it of items) {
       await pool.query(
-        `INSERT INTO order_items (order_id, service_id, quantity, price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, it.serviceId, it.quantity, it.price]
+        `INSERT INTO order_items (order_id, service_id, quantity, price, service_item_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          orderId,
+          Number(it.serviceId),
+          Number(it.quantity),
+          Number(it.price),
+          it.serviceItemId != null ? Number(it.serviceItemId) : null,
+        ]
       );
     }
 
@@ -543,9 +549,15 @@ router.post('/create-payment-intent', express.json(), async (req, res) => {
     // Insert order_items
     for (const it of items) {
       await pool.query(
-        `INSERT INTO order_items (order_id, service_id, quantity, price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, it.serviceId, it.quantity, it.price]
+        `INSERT INTO order_items (order_id, service_id, quantity, price, service_item_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          orderId,
+          Number(it.serviceId),
+          Number(it.quantity),
+          Number(it.price),
+          it.serviceItemId != null ? Number(it.serviceItemId) : null,
+        ]
       );
     }
 
@@ -661,9 +673,15 @@ router.post('/create-promptpay-intent', express.json(), async (req, res) => {
 
     for (const it of items) {
       await pool.query(
-        `INSERT INTO order_items (order_id, service_id, quantity, price)
-         VALUES ($1, $2, $3, $4)`,
-        [orderId, it.serviceId, it.quantity, it.price]
+        `INSERT INTO order_items (order_id, service_id, quantity, price, service_item_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          orderId,
+          Number(it.serviceId),
+          Number(it.quantity),
+          Number(it.price),
+          it.serviceItemId != null ? Number(it.serviceItemId) : null,
+        ]
       );
     }
 
