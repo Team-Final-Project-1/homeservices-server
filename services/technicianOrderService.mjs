@@ -13,7 +13,7 @@ const technicianOrderService = {
         o.appointment_time,
         o.remark,
         CONCAT('AD', LPAD(o.id::TEXT, 8, '0')) AS order_code,
-        a.address_line,
+        CONCAT_WS(' ', a.address_line, a.subdistrict, a.district, a.province, a.postal_code) AS address_line,
         a.latitude AS customer_lat,
         a.longitude AS customer_lng,
 
@@ -68,11 +68,15 @@ const technicianOrderService = {
         AND up.longitude IS NOT NULL
 
       GROUP BY o.id, o.status, o.net_price, o.created_at,
-               o.appointment_date, o.appointment_time, o.remark,
-               a.address_line,
-               a.latitude, a.longitude,
-               up.latitude, up.longitude,
-               u.full_name, u.phone
+         o.appointment_date, o.appointment_time, o.remark,
+         a.address_line,
+         a.subdistrict,
+         a.district,
+         a.province,
+         a.postal_code,
+         a.latitude, a.longitude,
+         up.latitude, up.longitude,
+         u.full_name, u.phone
 
       HAVING (6371 * acos(
         LEAST(1.0,
@@ -100,8 +104,8 @@ const technicianOrderService = {
       customer_lat: order.customer_lat ? Number(order.customer_lat) : null,
       customer_lng: order.customer_lng ? Number(order.customer_lng) : null,
       distance_km: Number(order.distance_km),
-      service_names: order.service_names.filter(Boolean),
-      item_names: order.item_names.filter(Boolean),
+      service_names: (order.service_names ?? []).filter(Boolean),
+      item_names: (order.item_names ?? []).filter(Boolean),
       customer_name: order.customer_name ?? "-",
       customer_phone: order.customer_phone ?? "-",
     }));
@@ -133,7 +137,7 @@ const technicianOrderService = {
            service_status = 'in_progress',
            updated_at = NOW()
          WHERE id = $1`,
-        [orderId]
+        [orderId],
       );
 
       const orderResult = await client.query(
