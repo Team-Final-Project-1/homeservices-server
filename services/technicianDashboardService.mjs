@@ -51,12 +51,14 @@ export async function getTechnicianDashboard(technicianId) {
       [technicianId],
     );
 
-    // avg rating
+    // avg rating (อิงจากงานที่ assignment เป็น completed ของช่างคนนี้)
     const avgRatingResult = await client.query(
       `SELECT AVG(r.rating)::float AS avg_rating
        FROM reviews r
-       JOIN orders o ON o.id = r.order_id
-       WHERE o.technician_id = $1`,
+       JOIN technician_assignments ta
+         ON ta.order_id = r.order_id
+        AND ta.technician_id = $1
+        AND ta.status = 'completed'`,
       [technicianId],
     );
 
@@ -117,17 +119,17 @@ export async function getTechnicianDashboard(technicianId) {
       [technicianId],
     );
 
-    // top tasks (services) — จากงาน completed
+    // top tasks (services) — จากงานที่ assignment เป็น completed
     const topTasksResult = await client.query(
       `SELECT
          s.id::text AS id,
          s.name AS "jobName",
          COUNT(*)::int AS count
-       FROM orders o
-       JOIN order_items oi ON oi.order_id = o.id
+       FROM technician_assignments ta
+       JOIN order_items oi ON oi.order_id = ta.order_id
        JOIN services s ON s.id = oi.service_id
-       WHERE o.technician_id = $1
-         AND o.service_status = 'completed'
+       WHERE ta.technician_id = $1
+         AND ta.status = 'completed'
        GROUP BY s.id, s.name
        ORDER BY COUNT(*) DESC
        LIMIT 5`,
