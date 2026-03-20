@@ -88,6 +88,7 @@ app.use(
       "http://localhost:3000",
       "http://localhost:3001",
       "https://homeservices-frontend-gold.vercel.app",
+      "https://home-service-technician.vercel.app",
     ],
     credentials: true,
   }),
