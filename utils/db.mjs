@@ -1,11 +1,13 @@
-import "dotenv/config";
-import * as pg from "pg";
+import pg from 'pg';
+const { Pool } = pg;
 
-const { Pool } = pg.default;
-
-
-const connectionPool = new Pool({
+const pool = new Pool({
   connectionString: process.env.CONNECTION_STRING,
+  ssl: { rejectUnauthorized: false }
 });
 
-export default connectionPool;
+pool.connect()
+  .then(() => console.log('✅ เชื่อมต่อ Supabase สำเร็จ!'))
+  .catch(err => console.error('❌ เชื่อมต่อ Database ล้มเหลว:', err));
+
+export default pool;
