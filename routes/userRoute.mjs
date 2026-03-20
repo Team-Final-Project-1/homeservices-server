@@ -100,6 +100,18 @@ router.post('/:authUserUuid/update-profile', upload.single('profileImage'), asyn
       WHERE id = $5
     `, [name || '', phone || '', username || '', profilePicUrl, internalUserId]);
 
+    // 3b. Keep user_profiles in sync so joins that read up.profile_pic stay correct
+    try {
+      await pool.query(
+        `UPDATE user_profiles
+         SET profile_pic = $2, avatar_url = $2, updated_at = NOW()
+         WHERE user_id = $1`,
+        [internalUserId, profilePicUrl],
+      );
+    } catch (syncErr) {
+      console.error('user_profiles sync (non-fatal):', syncErr);
+    }
+
     // 4. จัดการบันทึกที่อยู่ (เซฟเฉพาะบ้านเลขที่ เลิกเอาตำบลมาต่อท้าย)
     if (address_line || province) {
       const combinedAddressLine = address_line;

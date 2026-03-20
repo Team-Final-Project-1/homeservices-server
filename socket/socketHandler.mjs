@@ -7,8 +7,6 @@ export const initSocket = (io) => {
 
   io.on("connection", (socket) => {
 
-    console.log("🔌 Connected:", socket.id)
-
     // =============================
     // USER ONLINE
     // =============================
@@ -21,8 +19,6 @@ export const initSocket = (io) => {
       }
 
       onlineUsers.get(String(userId)).add(socket.id)
-
-      console.log("🟢 user online:", userId)
 
       io.emit("online_users", Array.from(onlineUsers.keys()))
     })
@@ -88,9 +84,12 @@ export const initSocket = (io) => {
 
         console.log("📤 emit message:", mappedMessage)
 
+        console.log("📤 emit message:", mappedMessage)
+
         io.to(String(order_id)).emit("receive_message", mappedMessage)
 
       } catch (err) {
+        console.log("❌ send_message error:", err.message)
         console.log("❌ send_message error:", err.message)
         socket.emit("error", err.message)
       }

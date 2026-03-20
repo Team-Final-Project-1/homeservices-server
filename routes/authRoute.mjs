@@ -186,6 +186,7 @@ authRouter.get("/get-user", protectAuth, async (req, res) => {
       return res.status(401).json({ error: "Unauthorized or token expired" });
     }
     const supabaseUserId = data.user.id;
+    // Prefer users.profile_pic (updated by POST .../update-profile); fall back to user_profiles / metadata
     const query = `SELECT 
         u.id,
         u.email,
@@ -193,7 +194,11 @@ authRouter.get("/get-user", protectAuth, async (req, res) => {
         u.role,
         u.full_name,
         u.phone,
-        COALESCE(up.profile_pic, up.avatar_url) AS profile_pic
+        COALESCE(
+          NULLIF(TRIM(COALESCE(u.profile_pic, '')), ''),
+          up.profile_pic,
+          up.avatar_url
+        ) AS profile_pic
       FROM users u
       LEFT JOIN user_profiles up ON up.user_id = u.id
       WHERE u.auth_user_id = $1

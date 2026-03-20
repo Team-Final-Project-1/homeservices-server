@@ -10,6 +10,8 @@ export const startChatCleanup = () => {
 
       console.log("🧹 Running chat cleanup job...")
 
+      console.log("🧹 Running chat cleanup job...")
+
       const query = `
         DELETE FROM messages m
         USING orders o
@@ -18,9 +20,11 @@ export const startChatCleanup = () => {
           AND m.created_at < NOW() - INTERVAL '30 days'
       `
 
-      const result = await pool.query(query)
+      console.log(`✅ Deleted ${result.rowCount} old messages`)
 
       console.log(`✅ Deleted ${result.rowCount} old messages`)
+
+      const result = await pool.query(query)
 
     } catch (err) {
       console.error("❌ Cleanup crash:", err)
