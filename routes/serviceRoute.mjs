@@ -42,18 +42,27 @@ serviceRouter.get("/", async (req, res) => {
       filter,
     } = req.query;
 
+    // รีวิวผูกกับ order (ไม่มี service_id) — เฉลี่ยคะแนนจากออเดอร์ที่มีรายการบริการนี้
+    const avgRatingSubquery = `
+      COALESCE(
+        (SELECT AVG(r.rating)
+         FROM reviews r
+         INNER JOIN order_items oi ON oi.order_id = r.order_id AND oi.service_id = services.id),
+        0
+      )
+    `;
+
     let query = `
       SELECT
         services.*,
         categories.name AS category_name,
         categories.name_th AS category_name_th,
-        COALESCE(AVG(reviews.rating), 0) AS avg_rating,
+        ${avgRatingSubquery} AS avg_rating,
         COUNT(DISTINCT order_items.id) AS order_count,
         MIN(service_items.price_per_unit) AS min_price,
         MAX(service_items.price_per_unit) AS max_price
       FROM services
       LEFT JOIN categories ON services.category_id = categories.id
-      LEFT JOIN reviews ON reviews.service_id = services.id
       LEFT JOIN order_items ON order_items.service_id = services.id
       LEFT JOIN service_items ON service_items.service_id = services.id
       WHERE 1=1
@@ -79,7 +88,7 @@ serviceRouter.get("/", async (req, res) => {
     const havingConditions = [];
 
     if (filter === "recommended") {
-      havingConditions.push("COALESCE(AVG(reviews.rating), 0) >= 4");
+      havingConditions.push(`${avgRatingSubquery} >= 4`);
     }
 
     if (min_price) {
@@ -415,7 +424,6 @@ serviceRouter.delete("/:id", protectAdmin, async (req, res) => {
       "DELETE FROM technician_services WHERE service_id = $1",
       [id],
     );
-    await client.query("DELETE FROM reviews WHERE service_id = $1", [id]);
     await client.query("DELETE FROM services WHERE id = $1", [id]);
 
     await client.query("COMMIT");
