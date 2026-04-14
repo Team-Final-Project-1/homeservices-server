@@ -27,6 +27,7 @@ import technicianProfileRoute from "./routes/technicianProfileRoute.mjs"
 import authRoute from "./routes/authRoute.mjs"
 import technicianHistoryRoute from "./routes/technicianHistoryRoute.mjs"
 import orderRoute from "./routes/orderRoute.mjs"
+import reviewRoute from "./routes/reviewRoute.mjs"
 import promotionRouter from "./routes/promotionRoute.mjs"
 import cartRoute from "./routes/cartRoute.mjs"
 import technicianOrderRoute from "./routes/technicianOrderRoute.mjs"
@@ -103,6 +104,7 @@ app.use("/api/payment", paymentGateway);
 app.use("/api/geocode", geocodeRoute);
 app.use("/api/auth", authRoute);
 app.use("/api/orders", orderRoute);
+app.use("/api/reviews", reviewRoute);
 app.use("/api/cart", cartRoute);
 app.use("/api/promotions", promotionRouter);
 app.use("/api/users", userRoute);
