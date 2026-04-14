@@ -38,7 +38,13 @@ router.get('/my-orders/:userId', async (req, res) => {
         o.created_at AS date,
         o.net_price AS price,
         up.full_name AS worker,
-        array_agg(s.name) FILTER (WHERE s.name IS NOT NULL) AS details
+        array_agg(s.name) FILTER (WHERE s.name IS NOT NULL) AS details,
+        (
+          SELECT EXISTS(
+            SELECT 1 FROM reviews r
+            WHERE r.order_id = o.id AND r.user_id = $1
+          )
+        ) AS has_reviewed
       FROM orders o
 
       LEFT JOIN LATERAL (
