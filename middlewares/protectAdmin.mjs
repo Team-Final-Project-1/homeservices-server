@@ -18,7 +18,7 @@ const protectAdmin = async (req, res, next) => {
     const supabaseUserId = data.user.id;
     const query = `
       SELECT role FROM users
-      WHERE id = $1
+      WHERE auth_user_id = $1
     `;
     const values = [supabaseUserId];
     const { rows } = await pool.query(query, values);
