@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import pool from "../utils/db.mjs";
 import generateUsername from "../utils/generateusername.mjs";
 import { supabaseAdmin } from "../utils/supabaseAdmin.mjs";
-import protectUser from "../middlewares/protectUser.mjs";
 import protectAuth from "../middlewares/protectAuth.mjs";
 
 const supabase = createClient(
@@ -176,16 +175,8 @@ authRouter.post("/login", async (req, res) => {
 });
 
 authRouter.get("/get-user", protectAuth, async (req, res) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized: Token missing" });
-  }
   try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error) {
-      return res.status(401).json({ error: "Unauthorized or token expired" });
-    }
-    const supabaseUserId = data.user.id;
+    const supabaseUserId = req.user.id;
     // Prefer users.profile_pic (updated by POST .../update-profile); fall back to user_profiles / metadata
     const query = `SELECT 
         u.id,
@@ -210,14 +201,14 @@ authRouter.get("/get-user", protectAuth, async (req, res) => {
     }
     res.status(200).json({
       id: rows[0].id,
-      auth_user_id: data.user.id,
+      auth_user_id: supabaseUserId,
       email: rows[0].email,
       username: rows[0].username ?? rows[0].email.split("@")[0],
       role: rows[0].role,
       full_name: rows[0].full_name,
       phone: rows[0].phone ?? "",
       profile_pic:
-        rows[0].profile_pic ?? data.user.user_metadata?.avatar_url ?? "",
+        rows[0].profile_pic ?? req.user.user_metadata?.avatar_url ?? "",
     });
   } catch (error) {
     console.error("Error fetching user data:", error);
@@ -226,29 +217,20 @@ authRouter.get("/get-user", protectAuth, async (req, res) => {
 });
 
 authRouter.put("/reset-password", protectAuth, async (req, res) => {
-  const token = req.headers.authorization?.split(" ")[1];
   const { oldPassword, newPassword } = req.body;
-  if (!token) {
-    return res.status(401).json({ error: "Unauthorized: Token missing" });
-  }
   if (!newPassword) {
     return res.status(400).json({ error: "New password is required" });
   }
   try {
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser(token);
-    if (userError || !userData.user) {
-      return res.status(401).json({ error: "Unauthorized or token expired" });
-    }
     const { error: loginError } = await supabase.auth.signInWithPassword({
-      email: userData.user.email,
+      email: req.user.email,
       password: oldPassword,
     });
     if (loginError) {
       return res.status(400).json({ error: "รหัสผ่านเดิมไม่ถูกต้อง" });
     }
     const { error: updateError } =
-      await supabaseAdmin.auth.admin.updateUserById(userData.user.id, {
+      await supabaseAdmin.auth.admin.updateUserById(req.user.id, {
         password: newPassword,
       });
     if (updateError) {
