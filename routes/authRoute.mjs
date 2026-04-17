@@ -141,7 +141,7 @@ authRouter.post("/register/technician", async (req, res) => {
 });
 
 authRouter.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, expectedRole } = req.body;
 
   if (!email?.trim() || !password?.trim()) {
     return res.status(400).json({ error: "กรุณากรอกอีเมลและรหัสผ่าน" });
@@ -164,6 +164,20 @@ authRouter.post("/login", async (req, res) => {
         .status(400)
         .json({ error: "ไม่สามารถเข้าสู่ระบบได้ กรุณาลองใหม่อีกครั้ง" });
     }
+
+    if (expectedRole) {
+      const { rows } = await pool.query(
+        `SELECT role FROM users WHERE auth_user_id = $1 LIMIT 1`,
+        [data.user.id],
+      );
+      const dbRole = rows[0]?.role;
+      if (!dbRole || dbRole !== expectedRole) {
+        return res.status(403).json({
+          error: "บัญชีผู้ใช้ของคุณไม่ได้รับสิทธิ์เข้าใช้งานระบบนี้",
+        });
+      }
+    }
+
     return res.status(200).json({
       message: "Signed in successfully",
       access_token: data.session.access_token,
