@@ -1,5 +1,5 @@
 import express from 'express';
-import { geocodeAddress } from '../utils/geocode.mjs';
+import { geocodeAddress, reverseGeocodeCoordinates } from '../utils/geocode.mjs';
 
 const router = express.Router();
 
@@ -38,6 +38,33 @@ router.get('/preview', async (req, res) => {
   } catch (err) {
     console.error('Geocode preview error:', err);
     res.status(500).json({ error: 'Geocode failed.' });
+  }
+});
+
+router.get('/reverse', async (req, res) => {
+  try {
+    const lat = Number(q(req, 'lat'));
+    const lng = Number(q(req, 'lng'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ error: 'Provide valid lat and lng.' });
+    }
+
+    const result = await reverseGeocodeCoordinates(lat, lng);
+    if (!result) {
+      return res.status(200).json({
+        address_line: null,
+        subdistrict: null,
+        district: null,
+        province: null,
+        postal_code: null,
+        display_name: null,
+      });
+    }
+
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('Reverse geocode error:', err);
+    return res.status(500).json({ error: 'Reverse geocode failed.' });
   }
 });
 
