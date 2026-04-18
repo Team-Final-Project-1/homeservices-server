@@ -28,6 +28,7 @@ export async function validateChatAccess(order_id, user_id) {
     SELECT 
       o.id,
       o.user_id,
+      o.status,
       ta.technician_id
     FROM orders o
 
@@ -49,6 +50,12 @@ export async function validateChatAccess(order_id, user_id) {
   // เช็คจาก assignment แทน
   if (!order.technician_id) {
     throw new Error("Chat not available yet")
+  }
+
+  // ห้ามแชทถ้างานเสร็จแล้วหรือถูกยกเลิก
+  const closedStatuses = ['completed', 'ดำเนินการสำเร็จ', 'cancelled', 'ยกเลิกคำสั่งซ่อม'];
+  if (closedStatuses.includes(order.status)) {
+    throw new Error("Chat is closed for this order status");
   }
 
   const isCustomer =

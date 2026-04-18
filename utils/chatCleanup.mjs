@@ -10,21 +10,16 @@ export const startChatCleanup = () => {
 
       console.log("🧹 Running chat cleanup job...")
 
-      console.log("🧹 Running chat cleanup job...")
-
       const query = `
         DELETE FROM messages m
         USING orders o
         WHERE m.order_id = o.id
-          AND o.service_status = 'completed'
-          AND m.created_at < NOW() - INTERVAL '30 days'
+          AND (o.status = 'completed' OR o.status = 'ดำเนินการสำเร็จ' OR o.status = 'cancelled' OR o.status = 'ยกเลิกคำสั่งซ่อม')
+          AND m.created_at < NOW() - INTERVAL '15 days'
       `
 
-      console.log(`✅ Deleted ${result.rowCount} old messages`)
-
-      console.log(`✅ Deleted ${result.rowCount} old messages`)
-
       const result = await pool.query(query)
+      console.log(`✅ Deleted ${result.rowCount} old messages`)
 
     } catch (err) {
       console.error("❌ Cleanup crash:", err)
