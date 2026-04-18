@@ -28,7 +28,7 @@ export async function validateChatAccess(order_id, user_id) {
     SELECT 
       o.id,
       o.user_id,
-      o.status,
+      o.service_status AS status,
       ta.technician_id
     FROM orders o
 
