@@ -181,6 +181,53 @@ const technicianOrderService = {
     );
     return { success: true, message: "ปฏิเสธงานสำเร็จ" };
   },
+
+  createTechnicianNotificationsForOrder: async (orderId, radiusKm = 10) => {
+    const result = await pool.query(
+      `
+      INSERT INTO technician_notifications (technician_id, order_id, type, message)
+      SELECT DISTINCT
+        tech.id AS technician_id,
+        o.id AS order_id,
+        'new_order' AS type,
+        CONCAT('มีงานใหม่ AD', LPAD(o.id::TEXT, 8, '0'), ' เข้ามาในพื้นที่ของคุณ') AS message
+      FROM orders o
+      JOIN addresses a ON a.id = o.address_id
+      JOIN order_items oi ON oi.order_id = o.id
+      JOIN users tech ON tech.role = 'technician'
+      JOIN user_profiles up ON up.user_id = tech.id
+      JOIN technician_services ts
+        ON ts.technician_id = tech.id
+       AND ts.service_id = oi.service_id
+      WHERE o.id = $1
+        AND o.status = 'completed'
+        AND (o.service_status IS NULL OR o.service_status = 'pending')
+        AND up.is_available IS TRUE
+        AND a.latitude IS NOT NULL
+        AND a.longitude IS NOT NULL
+        AND up.latitude IS NOT NULL
+        AND up.longitude IS NOT NULL
+        AND (6371 * acos(
+          LEAST(1.0,
+            cos(radians(up.latitude::float)) * cos(radians(a.latitude::float)) *
+            cos(radians(a.longitude::float) - radians(up.longitude::float)) +
+            sin(radians(up.latitude::float)) * sin(radians(a.latitude::float))
+          )
+        )) <= $2
+        AND NOT EXISTS (
+          SELECT 1
+          FROM technician_notifications tn
+          WHERE tn.technician_id = tech.id
+            AND tn.order_id = o.id
+            AND tn.type = 'new_order'
+        )
+      RETURNING id
+      `,
+      [orderId, radiusKm],
+    );
+
+    return result.rowCount ?? 0;
+  },
 };
 
 export default technicianOrderService;
