@@ -2,6 +2,7 @@ import express from 'express';
 import Stripe from 'stripe';
 import pool from '../utils/db.mjs';
 import { geocodeAddress } from '../utils/geocode.mjs';
+import technicianOrderService from "../services/technicianOrderService.mjs";
 
 const router = express.Router();
 
@@ -733,11 +734,7 @@ router.get('/session/:sessionId', async (req, res) => {
     // If payment is completed but webhook hasn't updated yet, ensure status is set to completed here as a fallback.
     if (session.payment_status === 'paid') {
       try {
-        await pool.query(
-          `UPDATE orders SET status = 'completed', updated_at = now() WHERE id = $1`,
-          [orderId]
-        );
-        await incrementPromotionUsageForOrder(orderId);
+        await markOrderCompletedAndNotifyTechnicians(orderId);
       } catch (e) {
         console.error('Failed to update order status in session endpoint:', e);
       }
@@ -922,6 +919,25 @@ async function incrementPromotionUsageForOrder(orderId) {
   }
 }
 
+async function markOrderCompletedAndNotifyTechnicians(orderId) {
+  await pool.query(
+    `UPDATE orders SET status = 'completed', updated_at = now() WHERE id = $1`,
+    [orderId]
+  );
+  await incrementPromotionUsageForOrder(orderId);
+
+  const notifyRadiusKm = Number(process.env.TECHNICIAN_NOTIFY_RADIUS_KM || 10);
+  try {
+    await technicianOrderService.createTechnicianNotificationsForOrder(
+      Number(orderId),
+      Number.isFinite(notifyRadiusKm) ? notifyRadiusKm : 10
+    );
+  } catch (err) {
+    // Notification failure must not block the paid-order flow.
+    console.error("Failed to create technician notifications:", err);
+  }
+}
+
 /**
  * Stripe webhook handler (must be mounted with express.raw() in app.mjs).
  * Verifies signature and on checkout.session.completed updates order status to 'completed'.
@@ -950,11 +966,7 @@ export async function stripeWebhookHandler(req, res) {
     const orderId = session.metadata?.orderId;
     if (orderId) {
       try {
-        await pool.query(
-          `UPDATE orders SET status = 'completed', updated_at = now() WHERE id = $1`,
-          [orderId]
-        );
-        await incrementPromotionUsageForOrder(orderId);
+        await markOrderCompletedAndNotifyTechnicians(orderId);
       } catch (err) {
         console.error('Failed to update order status after payment (checkout):', err);
       }
@@ -966,11 +978,7 @@ export async function stripeWebhookHandler(req, res) {
     const orderId = paymentIntent.metadata?.orderId;
     if (orderId) {
       try {
-        await pool.query(
-          `UPDATE orders SET status = 'completed', updated_at = now() WHERE id = $1`,
-          [orderId]
-        );
-        await incrementPromotionUsageForOrder(orderId);
+        await markOrderCompletedAndNotifyTechnicians(orderId);
       } catch (err) {
         console.error('Failed to update order status after payment (payment_intent):', err);
       }
@@ -1031,11 +1039,7 @@ router.post('/intent/mark-paid', express.json(), async (req, res) => {
       });
     }
 
-    await pool.query(
-      `UPDATE orders SET status = 'completed', updated_at = now() WHERE id = $1`,
-      [orderId]
-    );
-    await incrementPromotionUsageForOrder(orderId);
+    await markOrderCompletedAndNotifyTechnicians(orderId);
 
     if (cartItemId != null && Number.isFinite(Number(cartItemId))) {
       const cid = Number(cartItemId);
