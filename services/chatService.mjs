@@ -28,7 +28,7 @@ export async function validateChatAccess(order_id, user_id) {
     SELECT 
       o.id,
       o.user_id,
-      o.status,
+      o.service_status AS status,
       ta.technician_id
     FROM orders o
 
@@ -105,7 +105,7 @@ export async function getMessages(orderId, userId, page = 1) {
 
   await validateChatAccess(orderId, userId)
 
-  const limit = 30
+  const limit = 100 // เพิ่มเป็น 100 ข้อความ
   const offset = (page - 1) * limit
 
   const { rows } = await pool.query(`
@@ -113,10 +113,10 @@ export async function getMessages(orderId, userId, page = 1) {
       m.*,
       u.id AS sender_id_int
     FROM messages m
-    JOIN users u 
+    LEFT JOIN users u 
       ON u.auth_user_id = m.sender_id
     WHERE m.order_id = $1
-    ORDER BY m.created_at ASC
+    ORDER BY m.created_at DESC
     LIMIT $2 OFFSET $3
   `, [
     Number(orderId),
@@ -124,9 +124,12 @@ export async function getMessages(orderId, userId, page = 1) {
     offset
   ])
 
-  const mapped = rows.map(m => ({
+  // กลับลำดับให้เป็น เก่า -> ใหม่ สำหรับหน้าจอแชท
+  const reversed = [...rows].reverse()
+
+  const mapped = reversed.map(m => ({
     ...m,
-    sender_id: String(m.sender_id_int)
+    sender_id: String(m.sender_id_int || 0)
   }))
 
   return mapped

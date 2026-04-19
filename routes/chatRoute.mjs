@@ -50,24 +50,10 @@ router.get("/:orderId/chat-info", async (req, res) => {
     const { rows } = await pool.query(query, [Number(orderId)])
 
     if (!rows.length) {
-      console.log("❌ order not found:", orderId)
-      console.log("❌ order not found:", orderId)
       return res.status(404).json({ error: "Order not found" })
     }
 
     const row = rows[0]
-    console.log("📡 chat-info result:", {
-      orderId,
-      customer_id: row.customer_id,
-      technician_id: row.technician_id
-    })
-
-
-    console.log("📡 chat-info result:", {
-      orderId,
-      customer_id: row.customer_id,
-      technician_id: row.technician_id
-    })
 
     res.json({
       customer: {
