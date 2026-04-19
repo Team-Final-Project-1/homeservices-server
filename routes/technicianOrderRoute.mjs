@@ -36,6 +36,20 @@ technicianOrderRouter.post(
         return res.status(409).json({ message: result.message });
       }
 
+      // =========================================
+      // REALTIME: Notify customer that order is accepted
+      // =========================================
+      try {
+        const io = req.app.get("io");
+        if (io) {
+          // ส่งแบบ Global เพื่อให้ลูกค้าที่รออยู่ได้รับข่าว แม้จะยังไม่ได้เข้า Room
+          io.emit("order_accepted", { orderId: String(orderId) });
+        }
+      } catch (err) {
+        console.error("❌ Socket error in accept order:", err);
+      }
+      // =========================================
+
       res.status(200).json({ message: result.message });
     } catch (error) {
       console.error("Error accepting order:", error);
